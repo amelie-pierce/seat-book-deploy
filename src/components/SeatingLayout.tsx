@@ -8,6 +8,7 @@ interface SeatingLayoutProps {
   onSeatClick?: (seatId: string) => void;
   availableSeats?: string[];
   selectedSeat?: string;
+  selectedSeatsFromDropdown?: { [date: string]: string };
   seatingConfig: SeatingConfig;
   selectedDate?: string;
   onDateClick?: (date: string) => void;
@@ -20,7 +21,8 @@ interface SeatingLayoutProps {
   timeSlot?: 'AM' | 'PM' | 'FULL_DAY';
 }
 
-export default function SeatingLayout({ onSeatClick, availableSeats, selectedSeat, seatingConfig, selectedDate, onDateClick, bookedSeats = [], currentUser, timeSlot }: SeatingLayoutProps) {
+export default function SeatingLayout({ onSeatClick, availableSeats, selectedSeat, selectedSeatsFromDropdown = {}, seatingConfig, selectedDate, onDateClick, bookedSeats = [], currentUser, timeSlot }: SeatingLayoutProps) {
+  
   // Generate table rows dynamically based on configuration
   const generateTableRows = () => {
     const rows = [];
@@ -262,7 +264,17 @@ export default function SeatingLayout({ onSeatClick, availableSeats, selectedSea
                           tableLetter={row.letters[index]}
                           onSeatClick={onSeatClick}
                           availableSeats={availableSeats}
-                          selectedSeat={selectedSeat}
+                          selectedSeat={(() => {
+                            // Determine the effective selected seat for visual highlighting
+                            // Priority: 1. Clicked seat, 2. Dropdown selection for current date
+                            if (selectedSeat) {
+                              return selectedSeat;
+                            }
+                            if (selectedDate && selectedSeatsFromDropdown[selectedDate]) {
+                              return selectedSeatsFromDropdown[selectedDate];
+                            }
+                            return undefined;
+                          })()}
                           width={200}
                           height={70}
                           bookedSeats={bookedSeats}

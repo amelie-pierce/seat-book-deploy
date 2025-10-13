@@ -29,6 +29,7 @@ interface ReservationFormProps {
   userBookings?: { date: string; seatId: string; timeSlot: TimeSlotType }[];
   onBookingChange?: () => void;
   onClear?: () => void;
+  onDropdownSelectionChange?: (selections: { [date: string]: string }) => void;
   allBookingsForDate?: Array<{
     seatId: string;
     userId: string;
@@ -47,6 +48,7 @@ export default function ReservationForm({
   userBookings = [],
   onBookingChange,
   onClear,
+  onDropdownSelectionChange,
   allBookingsForDate = []
 }: ReservationFormProps) {
   const [showSuccess, setShowSuccess] = useState(false);
@@ -167,10 +169,16 @@ export default function ReservationForm({
   // Handle seat selection from dropdown
   const handleSeatSelectionFromDropdown = (dateStr: string, seatId: string) => {
     console.log(`🎯 Seat selected from dropdown: ${seatId} for ${dateStr}`);
-    setSelectedSeatsFromDropdown(prev => ({
-      ...prev,
+    const newSelections = {
+      ...selectedSeatsFromDropdown,
       [dateStr]: seatId
-    }));
+    };
+    setSelectedSeatsFromDropdown(newSelections);
+    
+    // Notify parent component about dropdown selection changes for visual sync
+    if (onDropdownSelectionChange) {
+      onDropdownSelectionChange(newSelections);
+    }
     
     // Auto-select time slot if not already selected
     if (!selectedTimeSlots[dateStr]) {
@@ -472,6 +480,11 @@ export default function ReservationForm({
       // Clear dropdown selections after submission
       setSelectedSeatsFromDropdown({});
       setPendingBookings({});
+      
+      // Notify parent about clearing dropdown selections
+      if (onDropdownSelectionChange) {
+        onDropdownSelectionChange({});
+      }
       
       // DON'T clear time slots for newly booked dates - they will become actual bookings
       // The time slots will be preserved and updated when userBookings refreshes

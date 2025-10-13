@@ -75,6 +75,7 @@ export default function Home() {
 
   const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
   const [selectedSeatsFromClick, setSelectedSeatsFromClick] = useState<{ [date: string]: string }>({});
+  const [selectedSeatsFromDropdown, setSelectedSeatsFromDropdown] = useState<{ [date: string]: string }>({});
   const [pendingSeatId, setPendingSeatId] = useState<string | null>(null);
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [userBookings, setUserBookings] = useState<BookingRecord[]>([]);
@@ -271,6 +272,7 @@ export default function Home() {
     // Clear all state before setting new user
     setSelectedSeat(null);
     setSelectedSeatsFromClick({});
+    setSelectedSeatsFromDropdown({});
     setUserBookings([]);
     setBookingsMap({});
     setPendingSeatId(null);
@@ -298,6 +300,7 @@ export default function Home() {
     // Clear all state before logout
     setSelectedSeat(null);
     setSelectedSeatsFromClick({});
+    setSelectedSeatsFromDropdown({});
     setUserBookings([]);
     setBookingsMap({});
     setPendingSeatId(null);
@@ -343,6 +346,7 @@ export default function Home() {
           // Clear selections - the ReservationForm should now have updated userBookings
           setSelectedSeat(null);
           setSelectedSeatsFromClick({});
+          setSelectedSeatsFromDropdown({});
           
           console.log('✅ Bookings created and state refreshed');
         } else {
@@ -354,6 +358,10 @@ export default function Home() {
         setBookingError("Failed to create bookings. Please try again.");
       }
     }
+  };
+
+  const handleDropdownSelectionChange = (selections: { [date: string]: string }) => {
+    setSelectedSeatsFromDropdown(selections);
   };
 
   const handleClearBooking = () => {
@@ -490,6 +498,7 @@ export default function Home() {
             onSeatClick={handleSeatClick}
             availableSeats={availableSeatsForDate}
             selectedSeat={selectedSeat || undefined}
+            selectedSeatsFromDropdown={selectedSeatsFromDropdown}
             seatingConfig={SEATING_CONFIG}
             selectedDate={selectedDate || undefined}
             onDateClick={handleDateClick}
@@ -516,6 +525,7 @@ export default function Home() {
             selectedSeatsFromClick={selectedSeatsFromClick}
             onSubmit={handleReservation}
             onClear={handleClearBooking}
+            onDropdownSelectionChange={handleDropdownSelectionChange}
             currentUser={currentUser || undefined}
             isAuthenticated={isAuthenticated}
             userBookings={userBookings.filter(b => b.status === 'ACTIVE').map(b => ({ 
