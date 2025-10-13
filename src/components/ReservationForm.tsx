@@ -20,6 +20,7 @@ type TimeSlotType = 'AM' | 'PM' | 'FULL_DAY';
 
 interface ReservationFormProps {
   selectedSeat?: string;
+  selectedSeatsFromClick?: { [date: string]: string };
   onSubmit?: (bookings: Array<{ date: string; seatId: string; timeSlot: TimeSlotType }>) => void;
   currentUser?: string;
   isAuthenticated?: boolean;
@@ -37,6 +38,7 @@ interface ReservationFormProps {
 
 export default function ReservationForm({
   selectedSeat,
+  selectedSeatsFromClick = {},
   onSubmit,
   currentUser,
   isAuthenticated = false,
@@ -200,6 +202,11 @@ export default function ReservationForm({
       return selectedSeat;
     }
     
+    // Check if there's a seat from clicking on the seating layout for this date
+    if (selectedSeatsFromClick[dateStr]) {
+      return selectedSeatsFromClick[dateStr];
+    }
+    
     // Otherwise check dropdown selection
     return selectedSeatsFromDropdown[dateStr] || '';
   };
@@ -233,16 +240,31 @@ export default function ReservationForm({
 
   // Initialize time slots from user bookings and handle updates
   useEffect(() => {
+    console.log('🔄 Processing userBookings update:', userBookings);
+    
     const initialTimeSlots: { [date: string]: TimeSlotType } = {};
     userBookings.forEach(booking => {
       if (booking.timeSlot) {
+        console.log(`📅 Setting time slot from booking: ${booking.date} = ${booking.timeSlot}`);
         initialTimeSlots[booking.date] = booking.timeSlot;
       }
     });
-    setSelectedTimeSlots(prev => ({
-      ...prev,
-      ...initialTimeSlots
-    }));
+    
+    // Only update if we have new booking data to add
+    if (Object.keys(initialTimeSlots).length > 0) {
+      setSelectedTimeSlots(prev => {
+        const newState = {
+          ...prev,  // Keep existing time slots
+          ...initialTimeSlots  // Override/add with authoritative booking data
+        };
+        console.log('🎯 Updated selectedTimeSlots (preserving existing):', newState);
+        console.log('🎯 Previous state was:', prev);
+        console.log('🎯 Booking data adds:', initialTimeSlots);
+        return newState;
+      });
+    } else if (userBookings.length === 0) {
+      console.log('⏸️ No user bookings and no time slots to add - keeping current state');
+    }
   }, [userBookings]);
 
   // Store dropdown selections as pending bookings
@@ -328,6 +350,47 @@ export default function ReservationForm({
     }
   }, [selectedSeat, selectedDate, lastSelectedSeat, allBookingsForDate, userBookings, getAvailableTimeSlots, pendingBookings]);
 
+  // Auto-select time slots for seats selected via clicking on seating layout
+  useEffect(() => {
+    Object.entries(selectedSeatsFromClick).forEach(([dateStr, seatId]) => {
+      if (seatId && !selectedTimeSlots[dateStr]) {
+        // Check if there's already a user booking for this date
+        const existingBooking = userBookings.find(b => b.date === dateStr);
+        if (existingBooking) {
+          return;
+        }
+
+        const availableSlots = getAvailableTimeSlots(seatId, dateStr);
+        console.log(`🎯 Auto-selecting time slot for clicked seat ${seatId} on ${dateStr}. Available slots:`, availableSlots);
+        
+        if (availableSlots.length === 3 && availableSlots.includes('FULL_DAY')) {
+          // If no one has booked any time slots, default to FULL_DAY
+          console.log(`🔄 Fully available clicked seat - auto-selecting FULL_DAY`);
+          setSelectedTimeSlots(prev => ({
+            ...prev,
+            [dateStr]: 'FULL_DAY'
+          }));
+        } else if (availableSlots.length === 1) {
+          // Only one slot available
+          const onlyAvailableSlot = availableSlots[0];
+          console.log(`🔄 One slot available for clicked seat - auto-selecting: ${onlyAvailableSlot}`);
+          setSelectedTimeSlots(prev => ({
+            ...prev,
+            [dateStr]: onlyAvailableSlot
+          }));
+        } else if (availableSlots.length === 2) {
+          // Two slots available, prefer non-FULL_DAY
+          const nonFullDaySlot = availableSlots.find(slot => slot !== 'FULL_DAY') || availableSlots[0];
+          console.log(`🔄 Two slots available for clicked seat - auto-selecting: ${nonFullDaySlot}`);
+          setSelectedTimeSlots(prev => ({
+            ...prev,
+            [dateStr]: nonFullDaySlot
+          }));
+        }
+      }
+    });
+  }, [selectedSeatsFromClick, selectedTimeSlots, userBookings, getAvailableTimeSlots]);
+
 
 
   const handleTimeSlotChange = (date: string, timeSlot: TimeSlotType) => {
@@ -342,36 +405,57 @@ export default function ReservationForm({
     // First check if there's an existing booking
     const existingBooking = userBookings.find(b => b.date === dateStr);
     if (existingBooking?.timeSlot) {
+      console.log(`⚡ Time slot from existing booking for ${dateStr}: ${existingBooking.timeSlot}`);
       return existingBooking.timeSlot;
     }
     // Then check if there's a selected time slot (only if it's not null/undefined)
     if (selectedTimeSlots[dateStr]) {
+      console.log(`⚡ Time slot from state for ${dateStr}: ${selectedTimeSlots[dateStr]}`);
       return selectedTimeSlots[dateStr];
     }
     // Return empty string if no booking or selection exists (before seat is clicked)
+    console.log(`⚡ No time slot found for ${dateStr}`);
     return '';
   };
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     
-    // Collect all bookings from dropdown selections and time slots
-    const allBookings: Array<{ date: string; seatId: string; timeSlot: TimeSlotType }> = [];
+    console.log('🚀 Starting submission process...');
+    console.log('📊 Current state:');
+    console.log('  selectedSeatsFromDropdown:', selectedSeatsFromDropdown);
+    console.log('  selectedSeatsFromClick:', selectedSeatsFromClick);
+    console.log('  selectedTimeSlots:', selectedTimeSlots);
+    console.log('  selectedSeat (current):', selectedSeat);
+    console.log('  selectedDate:', selectedDate);
     
-    // Collect from dropdown selections
+    // Collect all bookings from all sources
+    const allBookings: Array<{ date: string; seatId: string; timeSlot: TimeSlotType }> = [];
+    const processedDates = new Set<string>();
+    
+    // 1. Collect from dropdown selections
     Object.entries(selectedSeatsFromDropdown).forEach(([date, seatId]) => {
       const timeSlot = selectedTimeSlots[date];
       if (seatId && timeSlot) {
-        allBookings.push({
-          date,
-          seatId,
-          timeSlot
-        });
+        console.log(`📊 Counting dropdown booking: ${seatId} on ${date} (${timeSlot})`);
+        allBookings.push({ date, seatId, timeSlot });
+        processedDates.add(date);
       }
     });
     
-    // Also add current seat selection if it exists and not already in dropdown
-    if (selectedSeat && selectedDate && selectedTimeSlots[selectedDate] && !selectedSeatsFromDropdown[selectedDate]) {
+    // 2. Collect from clicked seat selections
+    Object.entries(selectedSeatsFromClick).forEach(([date, seatId]) => {
+      const timeSlot = selectedTimeSlots[date];
+      if (seatId && timeSlot && !processedDates.has(date)) {
+        console.log(`📊 Counting clicked booking: ${seatId} on ${date} (${timeSlot})`);
+        allBookings.push({ date, seatId, timeSlot });
+        processedDates.add(date);
+      }
+    });
+    
+    // 3. Add current seat selection if it exists and not already processed
+    if (selectedSeat && selectedDate && selectedTimeSlots[selectedDate] && !processedDates.has(selectedDate)) {
+      console.log(`📊 Counting current booking: ${selectedSeat} on ${selectedDate} (${selectedTimeSlots[selectedDate]})`);
       allBookings.push({
         date: selectedDate,
         seatId: selectedSeat,
@@ -379,12 +463,21 @@ export default function ReservationForm({
       });
     }
     
+    console.log(`📊 Total bookings ready: ${allBookings.length}`);
+    console.log('📊 All bookings:', allBookings);
+    
     if (onSubmit && allBookings.length > 0) {
       onSubmit(allBookings);
       
-      // Clear all selections after submission
+      // Clear dropdown selections after submission
       setSelectedSeatsFromDropdown({});
       setPendingBookings({});
+      
+      // DON'T clear time slots for newly booked dates - they will become actual bookings
+      // The time slots will be preserved and updated when userBookings refreshes
+      console.log('✅ Keeping time slots for newly booked dates - they will become actual bookings');
+      
+      // Note: selectedSeatsFromClick is managed by the parent component
     }
     setShowSuccess(true);
   };
@@ -413,18 +506,30 @@ export default function ReservationForm({
     // Calculate total bookings to be created
     const calculateTotalBookings = () => {
       let count = 0;
+      const processedDates = new Set<string>();
       
-      // Count current selection
-      if (selectedSeat && selectedDate && selectedTimeSlots[selectedDate]) {
-        count++;
-      }
-      
-      // Count pending bookings (excluding current selection)
-      Object.keys(pendingBookings).forEach(date => {
-        if (!(selectedSeat && selectedDate === date)) {
+      // Count dropdown selections
+      Object.entries(selectedSeatsFromDropdown).forEach(([date, seatId]) => {
+        const timeSlot = selectedTimeSlots[date];
+        if (seatId && timeSlot) {
           count++;
+          processedDates.add(date);
         }
       });
+      
+      // Count clicked seat selections
+      Object.entries(selectedSeatsFromClick).forEach(([date, seatId]) => {
+        const timeSlot = selectedTimeSlots[date];
+        if (seatId && timeSlot && !processedDates.has(date)) {
+          count++;
+          processedDates.add(date);
+        }
+      });
+      
+      // Count current selection if not already processed
+      if (selectedSeat && selectedDate && selectedTimeSlots[selectedDate] && !processedDates.has(selectedDate)) {
+        count++;
+      }
       
       return count;
     };

@@ -74,6 +74,7 @@ export default function Home() {
   };
 
   const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
+  const [selectedSeatsFromClick, setSelectedSeatsFromClick] = useState<{ [date: string]: string }>({});
   const [pendingSeatId, setPendingSeatId] = useState<string | null>(null);
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [userBookings, setUserBookings] = useState<BookingRecord[]>([]);
@@ -250,13 +251,26 @@ export default function Home() {
       }
 
       // If authenticated, proceed with seat selection
-      setSelectedSeat(seatId === selectedSeat ? null : seatId);
+      if (selectedDate) {
+        const currentClickedSeat = selectedSeatsFromClick[selectedDate];
+        const newSeatId = seatId === currentClickedSeat ? null : seatId;
+        
+        // Update per-date seat selection
+        setSelectedSeatsFromClick(prev => ({
+          ...prev,
+          [selectedDate]: newSeatId || ''
+        }));
+        
+        // Also update the main selectedSeat for current date compatibility
+        setSelectedSeat(newSeatId);
+      }
     }
   };
 
   const handleUserAuthenticated = async (userId: string) => {
     // Clear all state before setting new user
     setSelectedSeat(null);
+    setSelectedSeatsFromClick({});
     setUserBookings([]);
     setBookingsMap({});
     setPendingSeatId(null);
@@ -283,6 +297,7 @@ export default function Home() {
   const handleLogout = async () => {
     // Clear all state before logout
     setSelectedSeat(null);
+    setSelectedSeatsFromClick({});
     setUserBookings([]);
     setBookingsMap({});
     setPendingSeatId(null);
@@ -316,17 +331,20 @@ export default function Home() {
             setBookingError(`Some bookings failed: ${result.error}`);
           }
 
-          // Reload user bookings
+          // Reload user bookings FIRST
           const userData = await bookingService.loadUserData(currentUser);
           setUserBookings(userData.userBookings);
 
-          // Clear selected seat
-          setSelectedSeat(null);
-
-          // Refresh the current date view
+          // Refresh the current date view to update allBookingsForDate
           if (selectedDate) {
             await handleDateClick(selectedDate);
           }
+
+          // Clear selections - the ReservationForm should now have updated userBookings
+          setSelectedSeat(null);
+          setSelectedSeatsFromClick({});
+          
+          console.log('✅ Bookings created and state refreshed');
         } else {
           console.log("❌ Booking failed:", result.error);
           setBookingError(result.error || "Failed to create bookings");
@@ -340,12 +358,20 @@ export default function Home() {
 
   const handleClearBooking = () => {
     setSelectedSeat(null);
+    // Also clear the per-date click selection for current date
+    if (selectedDate) {
+      setSelectedSeatsFromClick(prev => ({
+        ...prev,
+        [selectedDate]: ''
+      }));
+    }
   };
 
   const handleDateClick = useCallback(async (dateStr: string) => {
     setSelectedDate(dateStr);
-    // Clear selected seat when changing date so user starts fresh on new date
-    setSelectedSeat(null);
+    // Restore seat selection for this date if it exists
+    const clickedSeatForDate = selectedSeatsFromClick[dateStr];
+    setSelectedSeat(clickedSeatForDate || null);
 
     // Fetch reserved seats and all bookings for the selected date
     try {
@@ -372,7 +398,7 @@ export default function Home() {
       setAllBookingsForDate([]);
       setBookingError("Failed to load seats for selected date");
     }
-  }, []);
+  }, [selectedSeatsFromClick]);
 
   // Show loading state while checking authentication or loading bookings
   if (isLoading || isLoadingBookings) {
@@ -487,6 +513,7 @@ export default function Home() {
             selectedDate={selectedDate || undefined}
             onDateClick={handleDateClick}
             selectedSeat={selectedSeat || undefined}
+            selectedSeatsFromClick={selectedSeatsFromClick}
             onSubmit={handleReservation}
             onClear={handleClearBooking}
             currentUser={currentUser || undefined}
