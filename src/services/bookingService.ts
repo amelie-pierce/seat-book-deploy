@@ -71,6 +71,92 @@ export class BookingService {
     };
   }
 
+  // Create multiple bookings in a single operation
+  async createMultipleBookings(
+    userId: string,
+    bookings: Array<{ seatId: string; timeSlot: 'AM' | 'PM' | 'FULL_DAY'; date: string }>
+  ): Promise<{ success: boolean; bookings?: BookingRecord[]; error?: string; failedBookings?: string[] }> {
+    await this.initializeDatabase();
+    
+    try {
+      const createdBookings: BookingRecord[] = [];
+      const failedBookings: string[] = [];
+
+      // Validate all bookings first
+      for (const bookingRequest of bookings) {
+        const { seatId, timeSlot, date } = bookingRequest;
+
+        // Check if user already has a booking for this date
+        if (hasUserBookingForDate(this.cachedBookings, userId, date)) {
+          failedBookings.push(`You already have a booking for ${date}`);
+          continue;
+        }
+
+        // Check if seat is already booked for this date and time
+        const existingBooking = this.cachedBookings.find((b: BookingRecord) => 
+          b.seatId === seatId && 
+          b.date === date && 
+          b.status === 'ACTIVE' && (
+            timeSlot === 'FULL_DAY' || // If requesting full day, check any existing booking
+            b.timeSlot === 'FULL_DAY' || // If existing booking is full day, conflict with any request
+            b.timeSlot === timeSlot // If requesting same time slot as existing booking
+          )
+        );
+
+        if (existingBooking) {
+          failedBookings.push(`Seat ${seatId} is already booked for ${date} (${timeSlot})`);
+          continue;
+        }
+
+        // Create new booking record
+        const newBooking: BookingRecord = {
+          id: generateBookingId(),
+          userId,
+          seatId,
+          date,
+          timeSlot,
+          bookingTimestamp: new Date().toISOString(),
+          status: 'ACTIVE',
+          tableNumber: seatId.charAt(0), // Extract table letter
+        };
+
+        createdBookings.push(newBooking);
+      }
+
+      // If there are validation failures, return them
+      if (failedBookings.length > 0 && createdBookings.length === 0) {
+        return { 
+          success: false, 
+          error: failedBookings.join('; '),
+          failedBookings
+        };
+      }
+
+      // Save all valid bookings
+      for (const booking of createdBookings) {
+        // Add to cache
+        this.cachedBookings.push(booking);
+        
+        // Save to CSV data service for persistence
+        await csvDataService.saveBookingAsReservation(booking);
+      }
+
+      console.log(`✅ ${createdBookings.length} bookings created successfully${failedBookings.length > 0 ? ` (${failedBookings.length} failed)` : ''}`);
+      
+      return { 
+        success: true, 
+        bookings: createdBookings,
+        ...(failedBookings.length > 0 && { 
+          error: `Some bookings failed: ${failedBookings.join('; ')}`,
+          failedBookings 
+        })
+      };
+    } catch (error) {
+      console.error('❌ Error creating multiple bookings:', error);
+      return { success: false, error: 'Failed to create bookings' };
+    }
+  }
+
   // Create a new booking and immediately save to CSV
   async createBooking(
     userId: string, 

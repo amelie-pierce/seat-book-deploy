@@ -74,7 +74,6 @@ export default function Home() {
   };
 
   const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
-  const [reservedSeats, setReservedSeats] = useState<string[]>([]);
   const [pendingSeatId, setPendingSeatId] = useState<string | null>(null);
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [userBookings, setUserBookings] = useState<BookingRecord[]>([]);
@@ -109,10 +108,8 @@ export default function Home() {
         // Initialize the CSV database
         await bookingService.initializeDatabase();
 
-        // Load reserved seats and all bookings for today
-        const reserved = await bookingService.getReservedSeats();
+        // Load all bookings for today
         const allBookings = await bookingService.getBookingsForDate(todayDate);
-        setReservedSeats(reserved);
         
         // Transform bookings to the format expected by Table component
         const bookedSeatsData = allBookings.map(booking => ({
@@ -123,7 +120,7 @@ export default function Home() {
         console.log(`📊 Setting bookedSeatsData for ${todayDate}:`, bookedSeatsData);
         setAllBookingsForDate(bookedSeatsData);
 
-        console.log(`🎯 Loaded ${reserved.length} reserved seats and ${allBookings.length} bookings for today`);
+        console.log(`🎯 Loaded ${allBookings.length} bookings for today`);
       } catch (error) {
         console.error("❌ Error initializing app:", error);
         
@@ -165,11 +162,9 @@ export default function Home() {
           }, {} as { [key: string]: { seatId: string; timeSlot: 'AM' | 'PM' | 'FULL_DAY' } });
           setBookingsMap(bookings);
 
-          // Refresh reserved seats and all bookings for current date
+          // Refresh all bookings for current date
           if (selectedDate) {
-            const reserved = await bookingService.getReservedSeats(selectedDate);
             const allBookings = await bookingService.getBookingsForDate(selectedDate);
-            setReservedSeats(reserved);
             
             // Transform bookings to the format expected by Table component
             const bookedSeatsData = allBookings.map(booking => ({
@@ -179,9 +174,10 @@ export default function Home() {
             }));
             setAllBookingsForDate(bookedSeatsData);
             
-            // Update available seats for the current date
+            // Update available seats for the current date  
+            const reservedSeats = allBookings.map(b => b.seatId);
             const seats = generateAllSeats(SEATING_CONFIG).filter(
-              (seat) => !reserved.includes(seat)
+              (seat) => !reservedSeats.includes(seat)
             );
             setAvailableSeatsForDate(seats);
           }
@@ -259,27 +255,20 @@ export default function Home() {
   };
 
   const handleUserAuthenticated = async (userId: string) => {
+    // Clear all state before setting new user
+    setSelectedSeat(null);
+    setUserBookings([]);
+    setBookingsMap({});
+    setPendingSeatId(null);
+    
     setUser(userId);
-
-    // If there was a pending seat selection, complete it now
-    if (pendingSeatId) {
-      setSelectedSeat(pendingSeatId);
-      setPendingSeatId(null);
-    }
 
     // Refresh booking data to ensure new user sees updated seat availability
     try {
       await bookingService.refreshFromCsv();
-      // Reload reserved seats for current date
+      // Reload bookings for current date
       if (selectedDate) {
-        const reserved = await bookingService.getReservedSeats(selectedDate);
-        setReservedSeats(reserved);
-        
-        // Update available seats for the current date
-        const seats = generateAllSeats(SEATING_CONFIG).filter(
-          (seat) => !reserved.includes(seat)
-        );
-        setAvailableSeatsForDate(seats);
+        await handleDateClick(selectedDate);
       }
     } catch (error) {
       console.error("Error refreshing data after login:", error);
@@ -292,87 +281,59 @@ export default function Home() {
   };
 
   const handleLogout = async () => {
-    clearUserSession();
+    // Clear all state before logout
     setSelectedSeat(null);
     setUserBookings([]);
+    setBookingsMap({});
+    setPendingSeatId(null);
     
-    // Refresh booking data to ensure new user sees updated seat availability
+    clearUserSession();
+    
+    // Refresh booking data to show clean state for next user
     try {
       await bookingService.refreshFromCsv();
-      // Reload reserved seats for current date
+      // Reload bookings for current date  
       if (selectedDate) {
-        const reserved = await bookingService.getReservedSeats(selectedDate);
-        setReservedSeats(reserved);
-        
-        // Update available seats for the current date
-        const seats = generateAllSeats(SEATING_CONFIG).filter(
-          (seat) => !reserved.includes(seat)
-        );
-        setAvailableSeatsForDate(seats);
+        await handleDateClick(selectedDate);
       }
     } catch (error) {
       console.error("Error refreshing data after logout:", error);
     }
   };
 
-  const handleReservation = async (date: string, timeSlot: 'AM' | 'PM' | 'FULL_DAY') => {
-    if (selectedSeat && currentUser && date) {
+  const handleReservation = async (bookings: Array<{ date: string; seatId: string; timeSlot: 'AM' | 'PM' | 'FULL_DAY' }>) => {
+    if (currentUser && bookings.length > 0) {
       try {
         setBookingError(null);
-        console.log(
-          `🎫 Creating booking: ${currentUser} -> ${selectedSeat} (${timeSlot}) on ${date}`
-        );
+        console.log(`🎫 Creating ${bookings.length} bookings for ${currentUser}:`, bookings);
 
-        // Check if the time slot is available
-        const existingBookings = await bookingService.getBookingsForDate(date);
-        const conflictingBooking = existingBookings.find(booking => 
-          booking.seatId === selectedSeat && (
-            timeSlot === 'FULL_DAY' ||
-            booking.timeSlot === 'FULL_DAY' ||
-            booking.timeSlot === timeSlot
-          )
-        );
-
-        if (conflictingBooking) {
-          setBookingError("This time slot is already taken");
-          return;
-        }
-
-        // Proceed with booking creation
-        setBookingError(null);
-        console.log(
-          `🎫 Creating booking: ${currentUser} -> ${selectedSeat} on ${date}`
-        );
-
-        const result = await bookingService.createBooking(
-          currentUser,
-          selectedSeat,
-          timeSlot,
-          date
-        );
+        const result = await bookingService.createMultipleBookings(currentUser, bookings);
 
         if (result.success) {
-          console.log("✅ Booking created successfully");
-
-          // Reload reserved seats from database for the selected date
-          const reserved = await bookingService.getReservedSeats(date);
-          setReservedSeats(reserved);
+          console.log(`✅ ${result.bookings?.length || 0} bookings created successfully`);
+          
+          if (result.failedBookings && result.failedBookings.length > 0) {
+            setBookingError(`Some bookings failed: ${result.error}`);
+          }
 
           // Reload user bookings
           const userData = await bookingService.loadUserData(currentUser);
           setUserBookings(userData.userBookings);
 
+          // Clear selected seat
           setSelectedSeat(null);
 
-          // Rerun handleDateClick to update availableSeatsForDate and rerender SeatingLayout
-          handleDateClick(date);
+          // Refresh the current date view
+          if (selectedDate) {
+            await handleDateClick(selectedDate);
+          }
         } else {
           console.log("❌ Booking failed:", result.error);
-          setBookingError(result.error || "Failed to create booking");
+          setBookingError(result.error || "Failed to create bookings");
         }
       } catch (error) {
-        console.error("❌ Error creating booking:", error);
-        setBookingError("Failed to create booking. Please try again.");
+        console.error("❌ Error creating bookings:", error);
+        setBookingError("Failed to create bookings. Please try again.");
       }
     }
   };
@@ -383,7 +344,8 @@ export default function Home() {
 
   const handleDateClick = useCallback(async (dateStr: string) => {
     setSelectedDate(dateStr);
-    setSelectedSeat(null); // Clear selected seat when changing date
+    // Clear selected seat when changing date so user starts fresh on new date
+    setSelectedSeat(null);
 
     // Fetch reserved seats and all bookings for the selected date
     try {
@@ -537,11 +499,9 @@ export default function Home() {
             allBookingsForDate={allBookingsForDate}
             onBookingChange={async () => {
               if (currentUser) {
-                // Refresh reserved seats and all bookings for the selected date
+                // Refresh all bookings for the selected date
                 const dateToRefresh = selectedDate || todayDate;
-                const reserved = await bookingService.getReservedSeats(dateToRefresh);
                 const allBookings = await bookingService.getBookingsForDate(dateToRefresh);
-                setReservedSeats(reserved);
                 
                 // Transform bookings to the format expected by Table component
                 const bookedSeatsData = allBookings.map(booking => ({
@@ -556,8 +516,9 @@ export default function Home() {
                 setUserBookings(userData.userBookings);
                 // Refresh available seats for the selected date
                 if (selectedDate) {
+                  const reservedSeats = allBookings.map(b => b.seatId);
                   const seats = generateAllSeats(SEATING_CONFIG).filter(
-                    (seat) => !reserved.includes(seat)
+                    (seat) => !reservedSeats.includes(seat)
                   );
                   setAvailableSeatsForDate(seats);
                   // If the selected seat was just deleted, clear it

@@ -20,7 +20,7 @@ type TimeSlotType = 'AM' | 'PM' | 'FULL_DAY';
 
 interface ReservationFormProps {
   selectedSeat?: string;
-  onSubmit?: (date: string, timeSlot: TimeSlotType) => void;
+  onSubmit?: (bookings: Array<{ date: string; seatId: string; timeSlot: TimeSlotType }>) => void;
   currentUser?: string;
   isAuthenticated?: boolean;
   onDateClick?: (date: string) => void;
@@ -50,6 +50,8 @@ export default function ReservationForm({
   const [showSuccess, setShowSuccess] = useState(false);
   const [selectedTimeSlots, setSelectedTimeSlots] = useState<{ [date: string]: TimeSlotType }>({});
   const [lastSelectedSeat, setLastSelectedSeat] = useState<string | undefined>(undefined);
+  const [pendingBookings, setPendingBookings] = useState<{ [date: string]: { seatId: string; timeSlot: TimeSlotType } }>({});
+  const [previousUser, setPreviousUser] = useState<string | undefined>(currentUser);
 
   // Get available time slots for a seat on a specific date
   const getAvailableTimeSlots = useCallback((seatId: string, dateStr: string): TimeSlotType[] => {
@@ -89,6 +91,32 @@ export default function ReservationForm({
     return availableSlots;
   }, [allBookingsForDate]);
 
+  // Reset all state when user changes (login/logout)
+  const resetAllState = useCallback(() => {
+    console.log('🔄 Resetting ReservationForm state');
+    setSelectedTimeSlots({});
+    setLastSelectedSeat(undefined);
+    setPendingBookings({});
+    setShowSuccess(false);
+  }, []);
+
+  // Watch for user changes and reset state
+  useEffect(() => {
+    if (previousUser !== currentUser) {
+      console.log(`👤 User changed from ${previousUser} to ${currentUser} - resetting state`);
+      resetAllState();
+      setPreviousUser(currentUser);
+    }
+  }, [currentUser, previousUser, resetAllState]);
+
+  // Also reset state when user logs out (becomes unauthenticated)
+  useEffect(() => {
+    if (!isAuthenticated && (selectedTimeSlots && Object.keys(selectedTimeSlots).length > 0)) {
+      console.log(`🚪 User logged out - resetting state`);
+      resetAllState();
+    }
+  }, [isAuthenticated, selectedTimeSlots, resetAllState]);
+
   // Initialize time slots from user bookings and handle updates
   useEffect(() => {
     const initialTimeSlots: { [date: string]: TimeSlotType } = {};
@@ -103,6 +131,24 @@ export default function ReservationForm({
     }));
   }, [userBookings]);
 
+  // Store current selection as pending booking when date changes
+  useEffect(() => {
+    // If we had a previous seat and date with a time slot, store it as pending
+    if (lastSelectedSeat && selectedDate && selectedTimeSlots[selectedDate]) {
+      const existingBooking = userBookings.find(b => b.date === selectedDate && b.seatId === lastSelectedSeat);
+      if (!existingBooking) {
+        console.log(`📝 Storing pending booking: ${lastSelectedSeat} on ${selectedDate} (${selectedTimeSlots[selectedDate]})`);
+        setPendingBookings(prev => ({
+          ...prev,
+          [selectedDate]: {
+            seatId: lastSelectedSeat,
+            timeSlot: selectedTimeSlots[selectedDate]
+          }
+        }));
+      }
+    }
+  }, [selectedDate, lastSelectedSeat, selectedTimeSlots, userBookings]);
+
   // Auto-select time slot when seat is selected based on availability
   useEffect(() => {
     if (selectedSeat && selectedDate) {
@@ -115,35 +161,54 @@ export default function ReservationForm({
         const availableSlots = getAvailableTimeSlots(selectedSeat, selectedDate);
         console.log(`🎯 Seat changed to ${selectedSeat} for ${selectedDate}. Available slots:`, availableSlots);
         
-        // If there's already a user booking for this date, don't change it
+        // Check if there's already a user booking for this date
         const existingBooking = userBookings.find(b => b.date === selectedDate);
         if (existingBooking) {
           console.log(`📌 User already has booking for ${selectedDate}:`, existingBooking);
           return;
         }
         
-        // Auto-select appropriate time slot when seat changes
+        // Check if there's a pending booking for this date
+        const pendingBooking = pendingBookings[selectedDate];
+        if (pendingBooking && pendingBooking.seatId === selectedSeat) {
+          console.log(`📌 Restoring pending booking for ${selectedDate}:`, pendingBooking);
+          setSelectedTimeSlots(prev => ({
+            ...prev,
+            [selectedDate]: pendingBooking.timeSlot
+          }));
+          return;
+        }
+        
+        // Auto-select appropriate time slot when seat changes based on availability
         if (availableSlots.length === 3 && availableSlots.includes('FULL_DAY')) {
-          // For fully available seats, default to FULL_DAY
+          // If no one has booked any time slots, default to FULL_DAY
           console.log(`🔄 Fully available seat - auto-selecting FULL_DAY`);
           setSelectedTimeSlots(prev => ({
             ...prev,
             [selectedDate]: 'FULL_DAY'
           }));
-        } else if (availableSlots.length > 0) {
-          // For partially available seats, select the only/first available option
-          const autoSelectedSlot = availableSlots[0];
-          console.log(`🔄 Partially available seat - auto-selecting: ${autoSelectedSlot}`);
+        } else if (availableSlots.length === 1) {
+          // Only one slot available (someone booked AM, only PM left OR someone booked PM, only AM left)
+          const onlyAvailableSlot = availableSlots[0];
+          console.log(`🔄 One slot available - auto-selecting: ${onlyAvailableSlot}`);
           setSelectedTimeSlots(prev => ({
             ...prev,
-            [selectedDate]: autoSelectedSlot
+            [selectedDate]: onlyAvailableSlot
+          }));
+        } else if (availableSlots.length === 2) {
+          // This should not normally happen with current logic, but handle just in case
+          const nonFullDaySlot = availableSlots.find(slot => slot !== 'FULL_DAY') || availableSlots[0];
+          console.log(`🔄 Two slots available - auto-selecting: ${nonFullDaySlot}`);
+          setSelectedTimeSlots(prev => ({
+            ...prev,
+            [selectedDate]: nonFullDaySlot
           }));
         } else {
           console.log(`⚠️ No available time slots for seat ${selectedSeat} on ${selectedDate}`);
         }
       }
     }
-  }, [selectedSeat, selectedDate, lastSelectedSeat, allBookingsForDate, userBookings, getAvailableTimeSlots]);
+  }, [selectedSeat, selectedDate, lastSelectedSeat, allBookingsForDate, userBookings, getAvailableTimeSlots, pendingBookings]);
 
   // Convert seat ID to readable format
   const formatSeatDisplay = (seatId: string) => {
@@ -173,15 +238,42 @@ export default function ReservationForm({
     if (selectedTimeSlots[dateStr]) {
       return selectedTimeSlots[dateStr];
     }
-    // Always default to FULL_DAY if no booking or selection exists
-    return 'FULL_DAY';
+    // Return empty string if no booking or selection exists (before seat is clicked)
+    return '';
   };
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    if (onSubmit && selectedDate) {
-      const timeSlot = selectedTimeSlots[selectedDate] || 'FULL_DAY';
-      onSubmit(selectedDate, timeSlot);
+    
+    // Collect all pending bookings across all dates
+    const allBookings: Array<{ date: string; seatId: string; timeSlot: TimeSlotType }> = [];
+    
+    // Add current selection if valid
+    if (selectedSeat && selectedDate && selectedTimeSlots[selectedDate]) {
+      allBookings.push({
+        date: selectedDate,
+        seatId: selectedSeat,
+        timeSlot: selectedTimeSlots[selectedDate]
+      });
+    }
+    
+    // Add all other pending bookings
+    Object.entries(pendingBookings).forEach(([date, booking]) => {
+      // Don't duplicate the current selection
+      if (!(selectedSeat && selectedDate === date)) {
+        allBookings.push({
+          date,
+          seatId: booking.seatId,
+          timeSlot: booking.timeSlot
+        });
+      }
+    });
+    
+    if (onSubmit && allBookings.length > 0) {
+      onSubmit(allBookings);
+      
+      // Clear all pending bookings after submission
+      setPendingBookings({});
     }
     setShowSuccess(true);
   };
@@ -194,13 +286,40 @@ export default function ReservationForm({
         delete newState[selectedDate];
         return newState;
       });
+      
+      // Clear pending booking for current date
+      setPendingBookings(prev => {
+        const newState = { ...prev };
+        delete newState[selectedDate];
+        return newState;
+      });
     }
     if (onClear) {
       onClear();
     }
   };
 
-    const isFormValid = isAuthenticated && selectedSeat;
+    // Calculate total bookings to be created
+    const calculateTotalBookings = () => {
+      let count = 0;
+      
+      // Count current selection
+      if (selectedSeat && selectedDate && selectedTimeSlots[selectedDate]) {
+        count++;
+      }
+      
+      // Count pending bookings (excluding current selection)
+      Object.keys(pendingBookings).forEach(date => {
+        if (!(selectedSeat && selectedDate === date)) {
+          count++;
+        }
+      });
+      
+      return count;
+    };
+
+    const totalBookings = calculateTotalBookings();
+    const isFormValid = isAuthenticated && totalBookings > 0;
 
     return (
       <>
@@ -214,7 +333,7 @@ export default function ReservationForm({
           }}
         >
           <Typography variant="h5" component="h2" mb={3} textAlign="center">
-            Reserve Your Seat
+            Reserve Your Seats
           </Typography>
 
           {selectedSeat && (
@@ -274,16 +393,20 @@ export default function ReservationForm({
                 const isPastDate = !isAfterFridayDeadline && date < today;
                 
                 let seatLabel;
+                const hasPendingBooking = pendingBookings[dateStr];
+                
                 if (isSelected) {
                   if (booking) {
                     seatLabel = formatSeatDisplay(booking.seatId);
                   } else if (selectedSeat) {
-                    seatLabel = formatSeatDisplay(selectedSeat);
+                    seatLabel = `${formatSeatDisplay(selectedSeat)} (pending)`;
                   } else {
                     seatLabel = "not booked yet";
                   }
                 } else if (booking) {
                   seatLabel = formatSeatDisplay(booking.seatId);
+                } else if (hasPendingBooking) {
+                  seatLabel = `${formatSeatDisplay(hasPendingBooking.seatId)} (pending)`;
                 } else {
                   seatLabel = "not booked yet";
                 }
@@ -313,12 +436,28 @@ export default function ReservationForm({
                     <FormControl size="small" sx={{ minWidth: 120 }}>
                       <Select
                         value={getTimeSlotForDate(dateStr)}
-                        onChange={(e) => handleTimeSlotChange(dateStr, e.target.value as TimeSlotType)}
+                        onChange={(e) => {
+                          const value = e.target.value as string;
+                          if (value === '') {
+                            // Handle empty selection by clearing the time slot
+                            setSelectedTimeSlots(prev => {
+                              const newState = { ...prev };
+                              delete newState[dateStr];
+                              return newState;
+                            });
+                          } else {
+                            handleTimeSlotChange(dateStr, value as TimeSlotType);
+                          }
+                        }}
                         displayEmpty
                         variant="outlined"
                         sx={{ height: 32, minWidth: '140px' }}
                         disabled={!!booking || isPastDate}
                       >
+                        {/* Empty option for no selection */}
+                        <MenuItem value="">
+                          <em>Select time slot</em>
+                        </MenuItem>
                         {(() => {
                           // Only filter time slots for the selected seat AND selected date
                           // For other dates, show all options unless there's an existing booking
@@ -341,8 +480,8 @@ export default function ReservationForm({
                     </FormControl>
                     <Chip
                       label={seatLabel}
-                      color={booking ? "secondary" : "default"}
-                      variant={booking ? "filled" : "outlined"}
+                      color={booking ? "secondary" : hasPendingBooking ? "warning" : "default"}
+                      variant={booking ? "filled" : hasPendingBooking ? "filled" : "outlined"}
                       sx={{ fontSize: "0.875rem" }}
                     />
                     <IconButton
@@ -393,9 +532,11 @@ export default function ReservationForm({
             >
               {!isAuthenticated
                 ? "Please Authenticate First"
-                : !selectedSeat
+                : totalBookings === 0
                 ? "Select a Seat"
-                : "Reserve Seat"}
+                : totalBookings === 1
+                ? "Reserve Seat"
+                : `Reserve ${totalBookings} Seats`}
             </Button>
           </Box>
         </Paper>
@@ -406,7 +547,7 @@ export default function ReservationForm({
           onClose={() => setShowSuccess(false)}
         >
           <Alert severity="success" onClose={() => setShowSuccess(false)}>
-            Reservation submitted successfully!
+            {totalBookings === 1 ? 'Reservation submitted successfully!' : `${totalBookings} reservations submitted successfully!`}
           </Alert>
 
         </Snackbar>
