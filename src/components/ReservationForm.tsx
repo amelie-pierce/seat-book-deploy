@@ -12,7 +12,7 @@ import {
   Select,
   MenuItem,
   FormControl,
-
+  ListSubheader,
 } from "@mui/material";
 import { Delete as DeleteIcon } from "@mui/icons-material";
 
@@ -52,6 +52,7 @@ export default function ReservationForm({
   const [lastSelectedSeat, setLastSelectedSeat] = useState<string | undefined>(undefined);
   const [pendingBookings, setPendingBookings] = useState<{ [date: string]: { seatId: string; timeSlot: TimeSlotType } }>({});
   const [previousUser, setPreviousUser] = useState<string | undefined>(currentUser);
+  const [selectedSeatsFromDropdown, setSelectedSeatsFromDropdown] = useState<{ [date: string]: string }>({});
 
   // Get available time slots for a seat on a specific date
   const getAvailableTimeSlots = useCallback((seatId: string, dateStr: string): TimeSlotType[] => {
@@ -91,12 +92,125 @@ export default function ReservationForm({
     return availableSlots;
   }, [allBookingsForDate]);
 
+  // Get available seats based on selected time slot and date
+  const getAvailableSeats = useCallback((dateStr: string, timeSlot: TimeSlotType | ''): string[] => {
+    if (!dateStr || !timeSlot) return [];
+
+    const availableSeats: string[] = [];
+    
+    // Generate all possible seats (assuming tables A-H, each with 6 seats)
+    const tables = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+    
+    tables.forEach(tableLetter => {
+      for (let seatNum = 1; seatNum <= 6; seatNum++) {
+        const seatId = `${tableLetter}${seatNum}`;
+        
+        // Check if this seat is available for the selected time slot
+        const seatBookings = allBookingsForDate.filter(booking => booking.seatId === seatId);
+        
+        let isAvailable = true;
+        
+        if (seatBookings.length > 0) {
+          // Check for conflicts with the selected time slot
+          const hasFullDayBooking = seatBookings.some(booking => booking.timeSlot === 'FULL_DAY');
+          const hasAmBooking = seatBookings.some(booking => booking.timeSlot === 'AM');
+          const hasPmBooking = seatBookings.some(booking => booking.timeSlot === 'PM');
+          
+          if (timeSlot === 'FULL_DAY') {
+            // FULL_DAY requires both AM and PM to be free
+            isAvailable = !hasFullDayBooking && !hasAmBooking && !hasPmBooking;
+          } else if (timeSlot === 'AM') {
+            // AM requires no FULL_DAY booking and no AM booking
+            isAvailable = !hasFullDayBooking && !hasAmBooking;
+          } else if (timeSlot === 'PM') {
+            // PM requires no FULL_DAY booking and no PM booking
+            isAvailable = !hasFullDayBooking && !hasPmBooking;
+          }
+        }
+        
+        if (isAvailable) {
+          availableSeats.push(seatId);
+        }
+      }
+    });
+    
+    return availableSeats;
+  }, [allBookingsForDate]);
+
+  // Group available seats by table for dropdown
+  const getGroupedAvailableSeats = useCallback((dateStr: string, timeSlot: TimeSlotType | '') => {
+    const availableSeats = getAvailableSeats(dateStr, timeSlot);
+    const grouped: { [table: string]: string[] } = {};
+    
+    availableSeats.forEach(seatId => {
+      const table = seatId.charAt(0);
+      if (!grouped[table]) {
+        grouped[table] = [];
+      }
+      grouped[table].push(seatId);
+    });
+    
+    // Sort seats within each table
+    Object.keys(grouped).forEach(table => {
+      grouped[table].sort((a, b) => {
+        const numA = parseInt(a.slice(1));
+        const numB = parseInt(b.slice(1));
+        return numA - numB;
+      });
+    });
+    
+    return grouped;
+  }, [getAvailableSeats]);
+
+  // Handle seat selection from dropdown
+  const handleSeatSelectionFromDropdown = (dateStr: string, seatId: string) => {
+    console.log(`🎯 Seat selected from dropdown: ${seatId} for ${dateStr}`);
+    setSelectedSeatsFromDropdown(prev => ({
+      ...prev,
+      [dateStr]: seatId
+    }));
+    
+    // Auto-select time slot if not already selected
+    if (!selectedTimeSlots[dateStr]) {
+      const availableSlots = getAvailableTimeSlots(seatId, dateStr);
+      if (availableSlots.length === 3 && availableSlots.includes('FULL_DAY')) {
+        setSelectedTimeSlots(prev => ({
+          ...prev,
+          [dateStr]: 'FULL_DAY'
+        }));
+      } else if (availableSlots.length === 1) {
+        setSelectedTimeSlots(prev => ({
+          ...prev,
+          [dateStr]: availableSlots[0]
+        }));
+      }
+    }
+  };
+
+  // Get current seat for a date (either from dropdown, external selection, or existing booking)
+  const getCurrentSeat = (dateStr: string) => {
+    // First check if there's an existing booking for this date
+    const booking = userBookings.find(b => b.date === dateStr);
+    if (booking) {
+      return booking.seatId;
+    }
+    
+    // Check if this is the selected date and we have a seat from external selection
+    if (selectedDate === dateStr && selectedSeat) {
+      return selectedSeat;
+    }
+    
+    // Otherwise check dropdown selection
+    return selectedSeatsFromDropdown[dateStr] || '';
+  };
+
   // Reset all state when user changes (login/logout)
   const resetAllState = useCallback(() => {
     console.log('🔄 Resetting ReservationForm state');
     setSelectedTimeSlots({});
     setLastSelectedSeat(undefined);
     setPendingBookings({});
+    setSelectedSeatsFromDropdown({});
     setShowSuccess(false);
   }, []);
 
@@ -131,23 +245,27 @@ export default function ReservationForm({
     }));
   }, [userBookings]);
 
-  // Store current selection as pending booking when date changes
+  // Store dropdown selections as pending bookings
   useEffect(() => {
-    // If we had a previous seat and date with a time slot, store it as pending
-    if (lastSelectedSeat && selectedDate && selectedTimeSlots[selectedDate]) {
-      const existingBooking = userBookings.find(b => b.date === selectedDate && b.seatId === lastSelectedSeat);
-      if (!existingBooking) {
-        console.log(`📝 Storing pending booking: ${lastSelectedSeat} on ${selectedDate} (${selectedTimeSlots[selectedDate]})`);
-        setPendingBookings(prev => ({
-          ...prev,
-          [selectedDate]: {
-            seatId: lastSelectedSeat,
-            timeSlot: selectedTimeSlots[selectedDate]
-          }
-        }));
+    // Update pending bookings based on dropdown selections and time slots
+    const newPendingBookings: { [date: string]: { seatId: string; timeSlot: TimeSlotType } } = {};
+    
+    Object.entries(selectedSeatsFromDropdown).forEach(([date, seatId]) => {
+      const timeSlot = selectedTimeSlots[date];
+      if (seatId && timeSlot) {
+        const existingBooking = userBookings.find(b => b.date === date && b.seatId === seatId);
+        if (!existingBooking) {
+          console.log(`📝 Storing pending booking from dropdown: ${seatId} on ${date} (${timeSlot})`);
+          newPendingBookings[date] = {
+            seatId,
+            timeSlot
+          };
+        }
       }
-    }
-  }, [selectedDate, lastSelectedSeat, selectedTimeSlots, userBookings]);
+    });
+    
+    setPendingBookings(newPendingBookings);
+  }, [selectedSeatsFromDropdown, selectedTimeSlots, userBookings]);
 
   // Auto-select time slot when seat is selected based on availability
   useEffect(() => {
@@ -210,15 +328,7 @@ export default function ReservationForm({
     }
   }, [selectedSeat, selectedDate, lastSelectedSeat, allBookingsForDate, userBookings, getAvailableTimeSlots, pendingBookings]);
 
-  // Convert seat ID to readable format
-  const formatSeatDisplay = (seatId: string) => {
-    if (seatId.length >= 2) {
-      const tableLetter = seatId.charAt(0);
-      const seatNumber = seatId.slice(1);
-      return `Table ${tableLetter}, Seat ${seatNumber}`;
-    }
-    return seatId;
-  };
+
 
   const handleTimeSlotChange = (date: string, timeSlot: TimeSlotType) => {
     console.log(`Setting time slot for ${date} to ${timeSlot}`);
@@ -245,11 +355,23 @@ export default function ReservationForm({
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     
-    // Collect all pending bookings across all dates
+    // Collect all bookings from dropdown selections and time slots
     const allBookings: Array<{ date: string; seatId: string; timeSlot: TimeSlotType }> = [];
     
-    // Add current selection if valid
-    if (selectedSeat && selectedDate && selectedTimeSlots[selectedDate]) {
+    // Collect from dropdown selections
+    Object.entries(selectedSeatsFromDropdown).forEach(([date, seatId]) => {
+      const timeSlot = selectedTimeSlots[date];
+      if (seatId && timeSlot) {
+        allBookings.push({
+          date,
+          seatId,
+          timeSlot
+        });
+      }
+    });
+    
+    // Also add current seat selection if it exists and not already in dropdown
+    if (selectedSeat && selectedDate && selectedTimeSlots[selectedDate] && !selectedSeatsFromDropdown[selectedDate]) {
       allBookings.push({
         date: selectedDate,
         seatId: selectedSeat,
@@ -257,22 +379,11 @@ export default function ReservationForm({
       });
     }
     
-    // Add all other pending bookings
-    Object.entries(pendingBookings).forEach(([date, booking]) => {
-      // Don't duplicate the current selection
-      if (!(selectedSeat && selectedDate === date)) {
-        allBookings.push({
-          date,
-          seatId: booking.seatId,
-          timeSlot: booking.timeSlot
-        });
-      }
-    });
-    
     if (onSubmit && allBookings.length > 0) {
       onSubmit(allBookings);
       
-      // Clear all pending bookings after submission
+      // Clear all selections after submission
+      setSelectedSeatsFromDropdown({});
       setPendingBookings({});
     }
     setShowSuccess(true);
@@ -391,25 +502,6 @@ export default function ReservationForm({
                 
                 // Check if date is in the past (only for current week scenario)
                 const isPastDate = !isAfterFridayDeadline && date < today;
-                
-                let seatLabel;
-                const hasPendingBooking = pendingBookings[dateStr];
-                
-                if (isSelected) {
-                  if (booking) {
-                    seatLabel = formatSeatDisplay(booking.seatId);
-                  } else if (selectedSeat) {
-                    seatLabel = `${formatSeatDisplay(selectedSeat)} (pending)`;
-                  } else {
-                    seatLabel = "not booked yet";
-                  }
-                } else if (booking) {
-                  seatLabel = formatSeatDisplay(booking.seatId);
-                } else if (hasPendingBooking) {
-                  seatLabel = `${formatSeatDisplay(hasPendingBooking.seatId)} (pending)`;
-                } else {
-                  seatLabel = "not booked yet";
-                }
                 return (
                   <Box
                     key={idx}
@@ -478,12 +570,59 @@ export default function ReservationForm({
                         })()}
                       </Select>
                     </FormControl>
-                    <Chip
-                      label={seatLabel}
-                      color={booking ? "secondary" : hasPendingBooking ? "warning" : "default"}
-                      variant={booking ? "filled" : hasPendingBooking ? "filled" : "outlined"}
-                      sx={{ fontSize: "0.875rem" }}
-                    />
+                    <FormControl size="small" sx={{ minWidth: 150 }}>
+                      <Select
+                        value={getCurrentSeat(dateStr)}
+                        onChange={(e) => handleSeatSelectionFromDropdown(dateStr, e.target.value as string)}
+                        displayEmpty
+                        variant="outlined"
+                        sx={{ height: 32, minWidth: '150px' }}
+                        disabled={!!booking || isPastDate}
+                      >
+                        {/* Empty option for no selection */}
+                        <MenuItem value="">
+                          <em>Select seat</em>
+                        </MenuItem>
+                        {(() => {
+                          // If there's an existing booking, show only that seat
+                          if (booking) {
+                            const tableLetter = booking.seatId.charAt(0);
+                            const seatNumber = booking.seatId.slice(1);
+                            return (
+                              <MenuItem key={booking.seatId} value={booking.seatId}>
+                                Table {tableLetter}, Seat {seatNumber} (Booked)
+                              </MenuItem>
+                            );
+                          }
+                          
+                          if (!selectedTimeSlots[dateStr]) {
+                            return null; // No seats shown until time slot is selected
+                          }
+                          
+                          const groupedSeats = getGroupedAvailableSeats(dateStr, selectedTimeSlots[dateStr]);
+                          
+                          return Object.keys(groupedSeats)
+                            .sort() // Sort table letters A, B, C, etc.
+                            .map(tableLetter => [
+                              <ListSubheader key={`header-${tableLetter}`}>
+                                Table {tableLetter}
+                              </ListSubheader>,
+                              ...groupedSeats[tableLetter]
+                                .sort((a, b) => {
+                                  // Sort by seat number
+                                  const numA = parseInt(a.slice(1));
+                                  const numB = parseInt(b.slice(1));
+                                  return numA - numB;
+                                })
+                                .map(seatId => (
+                                  <MenuItem key={seatId} value={seatId}>
+                                    Seat {seatId.slice(1)} ({seatId})
+                                  </MenuItem>
+                                ))
+                            ]).flat();
+                        })()}
+                      </Select>
+                    </FormControl>
                     <IconButton
                       color="error"
                       size="small"
