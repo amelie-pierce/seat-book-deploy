@@ -10,7 +10,7 @@ import {
   getReservedSeatsForDate,
   getTodayDate
 } from '../utils/bookingStorage';
-import { csvDataService } from './csvDataService';
+import { vercelDataService } from './vercelDataService';
 
 export class BookingService {
   private cachedBookings: BookingRecord[] = [];
@@ -23,11 +23,11 @@ export class BookingService {
     try {
       console.log('📊 Initializing booking database...');
       
-      // Initialize CSV data service
-      await csvDataService.initialize();
+      // Initialize Vercel data service
+      await vercelDataService.initialize();
       
-      // Load reservations from CSV data service and convert to bookings
-      const reservationBookings = await csvDataService.getBookingsFromReservations();
+      // Load reservations from Vercel data service and convert to bookings
+      const reservationBookings = await vercelDataService.getBookingsFromReservations();
       this.cachedBookings = reservationBookings;
       
       this.isInitialized = true;
@@ -42,8 +42,8 @@ export class BookingService {
   // Refresh data from CSV files
   async refreshFromCsv(): Promise<void> {
     console.log('� Refreshing booking data from CSV files...');
-    await csvDataService.refreshFromCsvFiles();
-    const reservationBookings = await csvDataService.getBookingsFromReservations();
+    await vercelDataService.refreshFromApi();
+    const reservationBookings = await vercelDataService.getBookingsFromReservations();
     this.cachedBookings = reservationBookings;
     console.log(`� Data refreshed with ${this.cachedBookings.length} records`);
   }
@@ -138,7 +138,7 @@ export class BookingService {
         this.cachedBookings.push(booking);
         
         // Save to CSV data service for persistence
-        await csvDataService.saveBookingAsReservation(booking);
+        await vercelDataService.saveBookingAsReservation(booking);
       }
 
       console.log(`✅ ${createdBookings.length} bookings created successfully${failedBookings.length > 0 ? ` (${failedBookings.length} failed)` : ''}`);
@@ -211,7 +211,7 @@ export class BookingService {
       this.cachedBookings.push(newBooking);
       
       // Save to CSV data service for persistence
-      await csvDataService.saveBookingAsReservation(newBooking);
+      await vercelDataService.saveBookingAsReservation(newBooking);
 
       console.log(`✅ New booking created and saved to CSV: ${userId} -> ${seatId} (${timeSlot}) on ${bookingDate}`);
       return { success: true, booking: newBooking };
@@ -241,7 +241,7 @@ export class BookingService {
       this.cachedBookings[bookingIndex].modifiedBy = userId;
 
       // Delete from CSV data service
-      await csvDataService.deleteReservation(bookingId);
+      await vercelDataService.deleteReservation(bookingId);
 
       console.log(`❌ Booking cancelled in CSV: ${bookingId} by ${userId}`);
       return { success: true };

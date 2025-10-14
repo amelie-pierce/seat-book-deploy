@@ -11,7 +11,7 @@ import {
   Alert
 } from '@mui/material';
 import { Person as PersonIcon } from '@mui/icons-material';
-import { csvDataService } from '../services/csvDataService';
+import { vercelDataService } from '../services/vercelDataService';
 
 interface UserAuthModalProps {
   open: boolean;
@@ -46,8 +46,10 @@ export default function UserAuthModal({
     }
 
     try {
-      // Check if user exists in CSV data
-      const existingUser = await csvDataService.getUserById(trimmedUserId);
+      console.log(`🔐 Attempting to authenticate user: "${trimmedUserId}"`);
+      
+      // Check if user exists via API
+      const existingUser = await vercelDataService.getUserById(trimmedUserId);
       
       if (existingUser) {
         // User exists, proceed with authentication
@@ -59,8 +61,9 @@ export default function UserAuthModal({
         onUserConfirmed(trimmedUserId);
         handleClose();
       } else {
-        // User does not exist in CSV file
-        setError('User not exists');
+        // User does not exist
+        console.log(`❌ User "${trimmedUserId}" not found in system`);
+        setError(`User "${trimmedUserId}" not found. Available users: 1234, U001, U002, U003, U004`);
         return;
       }
     } catch (error) {
@@ -85,7 +88,7 @@ export default function UserAuthModal({
     // Check if user exists for display purposes
     if (newUserId.trim().length >= 3) {
       try {
-        const existingUser = await csvDataService.getUserById(newUserId.trim());
+        const existingUser = await vercelDataService.getUserById(newUserId.trim());
         if (existingUser) {
           setIsExistingUser(true);
           setUserEmail(existingUser.email);

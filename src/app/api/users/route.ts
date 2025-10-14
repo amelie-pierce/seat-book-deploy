@@ -1,45 +1,66 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
-import { User, parseUsersCsvContent, createUsersCsvContent } from '../../../utils/bookingStorage';
 
-const CSV_FILE_PATH = path.join(process.cwd(), 'public', 'users.csv');
+// User interface for type safety
+export interface User {
+  user_id: string;
+  email: string;
+}
+
+// In-memory storage for Vercel compatibility (no filesystem operations)
+// Initialize with the same users from the original users.csv
+// eslint-disable-next-line prefer-const
+let inMemoryUsers: User[] = [
+  { user_id: '1234', email: 'dhuynh@strongtie.com' },
+  { user_id: 'U001', email: 'alice@mail.com' },
+  { user_id: 'U002', email: 'bob@mail.com' },
+  { user_id: 'U003', email: 'charlie@mail.com' },
+  { user_id: 'U004', email: 'hvu@strongtie.com' }
+];
 
 export async function GET() {
   try {
-    const csvContent = await fs.readFile(CSV_FILE_PATH, 'utf-8');
-    const users = parseUsersCsvContent(csvContent);
-    return NextResponse.json({ success: true, users });
+    console.log(`👥 GET /api/users - returning ${inMemoryUsers.length} users`);
+    return NextResponse.json({ 
+      success: true, 
+      users: inMemoryUsers,
+      count: inMemoryUsers.length 
+    });
   } catch (error) {
-    console.error('Error reading users CSV:', error);
-    return NextResponse.json({ success: false, error: 'Failed to read users' }, { status: 500 });
+    console.error('Error getting users:', error);
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Failed to get users' 
+    }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const { user }: { user: User } = await request.json();
+    console.log('👤 POST /api/users - Adding user:', user);
     
-    // Read current CSV content
-    const csvContent = await fs.readFile(CSV_FILE_PATH, 'utf-8');
-    const existingUsers = parseUsersCsvContent(csvContent);
+    // Check if user already exists (update) or is new
+    const existingIndex = inMemoryUsers.findIndex(u => u.user_id === user.user_id);
     
-    // Add or update the user
-    const existingIndex = existingUsers.findIndex(u => u.user_id === user.user_id);
     if (existingIndex >= 0) {
-      existingUsers[existingIndex] = user;
+      inMemoryUsers[existingIndex] = user;
+      console.log(`🔄 Updated existing user ${user.user_id}`);
     } else {
-      existingUsers.push(user);
+      inMemoryUsers.push(user);
+      console.log(`➕ Added new user ${user.user_id}`);
     }
     
-    // Write back to CSV file
-    const newCsvContent = createUsersCsvContent(existingUsers);
-    await fs.writeFile(CSV_FILE_PATH, newCsvContent, 'utf-8');
-    
-    console.log(`✅ User saved to CSV file: ${user.user_id}`);
-    return NextResponse.json({ success: true, message: 'User saved successfully' });
+    console.log(`✅ User ${user.user_id} saved successfully. Total users: ${inMemoryUsers.length}`);
+    return NextResponse.json({ 
+      success: true, 
+      user,
+      totalCount: inMemoryUsers.length 
+    });
   } catch (error) {
-    console.error('Error saving user to CSV:', error);
-    return NextResponse.json({ success: false, error: 'Failed to save user' }, { status: 500 });
+    console.error('Error saving user:', error);
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Failed to save user' 
+    }, { status: 500 });
   }
 }
