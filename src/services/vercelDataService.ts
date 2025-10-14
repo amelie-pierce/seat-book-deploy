@@ -14,6 +14,9 @@ export class VercelDataService {
   private cachedUsers: User[] = [];
   private cachedReservations: ReservationRecord[] = [];
   private isInitialized = false;
+  private lastApiCall = 0;
+  private readonly CACHE_DURATION = 5000; // 5 seconds cache to prevent rapid API calls
+  private initializationPromise: Promise<void> | null = null; // Prevent concurrent initializations
 
   constructor() {
     // Use relative URLs that work on both development and production
@@ -22,8 +25,31 @@ export class VercelDataService {
 
   // Initialize service by loading data from API endpoints
   async initialize(): Promise<void> {
-    if (this.isInitialized) return;
+    console.log('🔍 initialize() called from:', new Error().stack?.split('\n')[2]?.trim());
+    console.log('🔍 React StrictMode detected:', typeof window !== 'undefined' && window.React && window.React.version);
+    
+    if (this.isInitialized) {
+      console.log('📊 Vercel service already initialized - skipping API call');
+      return;
+    }
 
+    // If initialization is already in progress, wait for it
+    if (this.initializationPromise) {
+      console.log('⏳ Initialization already in progress - waiting...');
+      return this.initializationPromise;
+    }
+
+    // Start initialization
+    this.initializationPromise = this.performInitialization();
+    
+    try {
+      await this.initializationPromise;
+    } finally {
+      this.initializationPromise = null;
+    }
+  }
+
+  private async performInitialization(): Promise<void> {
     try {
       console.log('📊 Initializing Vercel data service...');
       
@@ -42,7 +68,20 @@ export class VercelDataService {
 
   // Load data from API endpoints
   private async loadFromApi(): Promise<void> {
+    const now = Date.now();
+    
+    // Add stack trace to see WHO is calling this
+    console.log('🔍 loadFromApi() called from:', new Error().stack?.split('\n')[2]?.trim());
+    
+    // Check if we recently loaded data (within cache duration)
+    if (this.isInitialized && (now - this.lastApiCall) < this.CACHE_DURATION) {
+      console.log(`⚡ Using cached data (${Math.round((now - this.lastApiCall)/1000)}s old) - skipping API call`);
+      return;
+    }
+
     try {
+      console.log('📡 Making API calls to load fresh data...');
+      
       // Load users from API
       const usersResponse = await fetch(`${this.baseUrl}/api/users`);
       if (!usersResponse.ok) {
@@ -59,7 +98,8 @@ export class VercelDataService {
       const reservationsData = await reservationsResponse.json();
       this.cachedReservations = reservationsData.reservations || [];
 
-      console.log('📄 Loaded data from API endpoints');
+      this.lastApiCall = now;
+      console.log('📄 Loaded fresh data from API endpoints');
       console.log(`👥 Loaded ${this.cachedUsers.length} users`);
       console.log(`🎫 Loaded ${this.cachedReservations.length} reservations`);
     } catch (error) {
@@ -72,22 +112,27 @@ export class VercelDataService {
     }
   }
 
-  // Refresh data by re-reading from API
+  // Refresh data by re-reading from API (forces fresh API call)
   async refreshFromApi(): Promise<void> {
-    console.log('🔄 Refreshing data from API...');
+    console.log('🔄 Force refreshing data from API...');
+    // Reset timestamp to force fresh API call
+    this.lastApiCall = 0;
     await this.loadFromApi();
     console.log(`🔄 Data refreshed: ${this.cachedUsers.length} users, ${this.cachedReservations.length} reservations`);
   }
 
-  // Get all users
+  // Get all users (assumes service is already initialized)
   async getUsers(): Promise<User[]> {
-    await this.initialize();
+    // Don't call initialize() here - should already be initialized by parent calls
     return [...this.cachedUsers];
   }
 
-  // Get user by ID
+  // Get user by ID (assumes service is already initialized)
   async getUserById(userId: string): Promise<User | null> {
-    await this.initialize();
+    // Only initialize if not already done (for safety in standalone calls)
+    if (!this.isInitialized) {
+      await this.initialize();
+    }
     console.log(`🔍 Looking for user: "${userId}"`);
     console.log(`📋 Available users:`, this.cachedUsers.map(u => u.user_id));
     const foundUser = this.cachedUsers.find(user => user.user_id === userId) || null;
@@ -95,9 +140,12 @@ export class VercelDataService {
     return foundUser;
   }
 
-  // Get user by email
+  // Get user by email (assumes service is already initialized)
   async getUserByEmail(email: string): Promise<User | null> {
-    await this.initialize();
+    // Only initialize if not already done (for safety in standalone calls)
+    if (!this.isInitialized) {
+      await this.initialize();
+    }
     return this.cachedUsers.find(user => user.email === email) || null;
   }
 
@@ -131,9 +179,9 @@ export class VercelDataService {
     }
   }
 
-  // Get all reservations
+  // Get all reservations (assumes service is already initialized)
   async getReservations(): Promise<ReservationRecord[]> {
-    await this.initialize();
+    // Don't call initialize() here - should already be initialized by parent calls
     return [...this.cachedReservations];
   }
 
