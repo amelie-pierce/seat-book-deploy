@@ -1,12 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ReservationRecord } from '../../../utils/bookingStorage';
+import { promises as fs } from 'fs';
+import path from 'path';
 
-// In-memory storage for Vercel deployment (persists during function lifetime)
-// This will reset between cold starts but that's acceptable for demo purposes
-const inMemoryReservations: ReservationRecord[] = [];
+// File path for persistent storage (Vercel allows /tmp directory writes)
+const TEMP_FILE_PATH = path.join('/tmp', 'reservations.json');
+
+// In-memory cache for performance
+let inMemoryReservations: ReservationRecord[] = [];
+let isLoaded = false;
+
+// Load reservations from persistent storage
+async function loadReservations(): Promise<void> {
+  if (isLoaded) return;
+  
+  try {
+    const data = await fs.readFile(TEMP_FILE_PATH, 'utf-8');
+    inMemoryReservations = JSON.parse(data);
+    console.log(`📂 Loaded ${inMemoryReservations.length} reservations from persistent storage`);
+  } catch {
+    // File doesn't exist or is corrupted, start with empty array
+    console.log('📂 No existing reservations file, starting fresh');
+    inMemoryReservations = [];
+  }
+  isLoaded = true;
+}
+
+// Save reservations to persistent storage
+async function saveReservations(): Promise<void> {
+  try {
+    await fs.writeFile(TEMP_FILE_PATH, JSON.stringify(inMemoryReservations, null, 2));
+    console.log(`💾 Saved ${inMemoryReservations.length} reservations to persistent storage`);
+  } catch (error) {
+    console.error('❌ Error saving reservations:', error);
+  }
+}
 
 export async function GET() {
   try {
+    await loadReservations();
     console.log(`📊 GET /api/reservations - returning ${inMemoryReservations.length} reservations`);
     return NextResponse.json({ 
       success: true, 
@@ -24,6 +56,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    await loadReservations();
     const { reservation }: { reservation: ReservationRecord } = await request.json();
     console.log('📝 POST /api/reservations - Adding reservation:', reservation);
 
@@ -38,6 +71,7 @@ export async function POST(request: NextRequest) {
       console.log(`➕ Added new reservation ${reservation.reservation_id}`);
     }
 
+    await saveReservations();
     console.log(`✅ Reservation ${reservation.reservation_id} saved successfully. Total reservations: ${inMemoryReservations.length}`);
     return NextResponse.json({ 
       success: true, 
@@ -55,6 +89,7 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    await loadReservations();
     const { searchParams } = new URL(request.url);
     const reservationId = searchParams.get('id');
     
@@ -82,6 +117,7 @@ export async function DELETE(request: NextRequest) {
     // Update the in-memory array
     inMemoryReservations.splice(0, inMemoryReservations.length, ...updatedReservations);
     
+    await saveReservations();
     console.log(`✅ Reservation ${reservationId} deleted successfully. Remaining: ${inMemoryReservations.length}`);
     return NextResponse.json({ 
       success: true, 

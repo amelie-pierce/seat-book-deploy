@@ -18,20 +18,24 @@ export class BookingService {
 
   // Initialize database connection and load all data
   async initializeDatabase(): Promise<void> {
-    if (this.isInitialized) return;
+    if (this.isInitialized) {
+      console.log('📊 Database already initialized - skipping (cache hit)');
+      return;
+    }
     
     try {
       console.log('📊 Initializing booking database...');
       
-      // Initialize Vercel data service
+      // Initialize Vercel data service (will only make API call if not already initialized)
       await vercelDataService.initialize();
       
       // Load reservations from Vercel data service and convert to bookings
+      // This will NOT make additional API calls since service is now initialized
       const reservationBookings = await vercelDataService.getBookingsFromReservations();
       this.cachedBookings = reservationBookings;
       
       this.isInitialized = true;
-      console.log(`📊 Database initialized with ${this.cachedBookings.length} records from CSV files`);
+      console.log(`📊 Database initialized with ${this.cachedBookings.length} records`);
     } catch (error) {
       console.error('❌ Error initializing database:', error);
       this.cachedBookings = [];
@@ -39,13 +43,23 @@ export class BookingService {
     }
   }
 
-  // Refresh data from CSV files
+  // Refresh data from API
   async refreshFromCsv(): Promise<void> {
-    console.log('� Refreshing booking data from CSV files...');
+    console.log('🔄 Refreshing booking data from API...');
+    
+    // Make sure we're initialized first, but don't force a refresh if we just initialized
+    if (!this.isInitialized) {
+      console.log('🔄 Not initialized yet, initializing instead of refreshing...');
+      await this.initializeDatabase();
+      return;
+    }
+    
+    // Force refresh data from API only if we're already initialized
     await vercelDataService.refreshFromApi();
+    // Get fresh bookings (no need to re-initialize since refreshFromApi already loaded fresh data)
     const reservationBookings = await vercelDataService.getBookingsFromReservations();
     this.cachedBookings = reservationBookings;
-    console.log(`� Data refreshed with ${this.cachedBookings.length} records`);
+    console.log(`🔄 Data refreshed with ${this.cachedBookings.length} records`);
   }
 
   // Load user-specific data on app open

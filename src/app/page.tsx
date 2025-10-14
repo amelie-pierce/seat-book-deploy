@@ -141,15 +141,21 @@ export default function Home() {
     initializeApp();
   }, [todayDate]);
 
-  // Load user-specific data when user logs in
+  // Load user-specific data when user logs in (not when date changes)
   useEffect(() => {
     const loadUserData = async () => {
       if (currentUser && isAuthenticated) {
         try {
           console.log(`👤 Loading data for user: ${currentUser}`);
           
-          // Refresh CSV data to get latest bookings
-          await bookingService.refreshFromCsv();
+          // Don't refresh if we just initialized - data is already fresh
+          // Only refresh if this is a re-login or explicit user change
+          const cacheInfo = bookingService.getCacheInfo();
+          if (!cacheInfo.isInitialized) {
+            await bookingService.refreshFromCsv();
+          } else {
+            console.log('📊 Using existing initialized data for user login');
+          }
           
           const userData = await bookingService.loadUserData(currentUser);
           setUserBookings(userData.userBookings);
@@ -164,25 +170,8 @@ export default function Home() {
           }, {} as { [key: string]: { seatId: string; timeSlot: 'AM' | 'PM' | 'FULL_DAY' } });
           setBookingsMap(bookings);
 
-          // Refresh all bookings for current date
-          if (selectedDate) {
-            const allBookings = await bookingService.getBookingsForDate(selectedDate);
-            
-            // Transform bookings to the format expected by Table component
-            const bookedSeatsData = allBookings.map(booking => ({
-              seatId: booking.seatId,
-              userId: booking.userId,
-              timeSlot: booking.timeSlot
-            }));
-            setAllBookingsForDate(bookedSeatsData);
-            
-            // Update available seats for the current date  
-            const reservedSeats = allBookings.map(b => b.seatId);
-            const seats = generateAllSeats(SEATING_CONFIG).filter(
-              (seat) => !reservedSeats.includes(seat)
-            );
-            setAvailableSeatsForDate(seats);
-          }
+          // Note: Date-specific data loading is handled by handleDateClick and other date change events
+          // We don't need to load it here during user login to avoid redundant API calls
 
           console.log(
             `📊 User ${currentUser} has ${userData.totalBookings} total bookings`
@@ -203,7 +192,7 @@ export default function Home() {
     };
 
     loadUserData();
-  }, [currentUser, isAuthenticated, selectedDate]);
+  }, [currentUser, isAuthenticated]); // Removed selectedDate to prevent unnecessary refreshes
 
   useEffect(() => {
     // Only run if selectedDate is set
