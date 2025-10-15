@@ -17,6 +17,7 @@ import {
 import SeatingLayout from "../components/SeatingLayout";
 import ReservationForm from "../components/ReservationForm";
 import UserAuthModal from "../components/UserAuthModal";
+import BookingStatus from "../components/BookingStatus";
 import { useUserSession } from "../hooks/useUserSession";
 import { SEATING_CONFIG, generateAllSeats } from "../config/seatingConfig";
 import { bookingService } from "../services/bookingService";
@@ -105,7 +106,6 @@ export default function Home() {
     const initializeApp = async () => {
       try {
         setIsLoadingBookings(true);
-        console.log("🚀 App starting - initializing booking system...");
 
         // Initialize the CSV database
         await bookingService.initializeDatabase();
@@ -119,10 +119,7 @@ export default function Home() {
           userId: booking.userId,
           timeSlot: booking.timeSlot
         }));
-        console.log(`📊 Setting bookedSeatsData for ${todayDate}:`, bookedSeatsData);
         setAllBookingsForDate(bookedSeatsData);
-
-        console.log(`🎯 Loaded ${allBookings.length} bookings for today`);
       } catch (error) {
         console.error("❌ Error initializing app:", error);
         
@@ -146,15 +143,11 @@ export default function Home() {
     const loadUserData = async () => {
       if (currentUser && isAuthenticated) {
         try {
-          console.log(`👤 Loading data for user: ${currentUser}`);
-          
           // Don't refresh if we just initialized - data is already fresh
           // Only refresh if this is a re-login or explicit user change
           const cacheInfo = bookingService.getCacheInfo();
           if (!cacheInfo.isInitialized) {
             await bookingService.refreshFromCsv();
-          } else {
-            console.log('📊 Using existing initialized data for user login');
           }
           
           const userData = await bookingService.loadUserData(currentUser);
@@ -173,14 +166,7 @@ export default function Home() {
           // Note: Date-specific data loading is handled by handleDateClick and other date change events
           // We don't need to load it here during user login to avoid redundant API calls
 
-          console.log(
-            `📊 User ${currentUser} has ${userData.totalBookings} total bookings`
-          );
-          if (userData.todayBooking) {
-            console.log(
-              `📅 Today's booking: ${userData.todayBooking.seatId} (${userData.todayBooking.timeSlot})`
-            );
-          }
+
         } catch (error) {
           console.error("❌ Error loading user data:", error);
         }
@@ -251,6 +237,13 @@ export default function Home() {
           [selectedDate]: newSeatId || ''
         }));
         
+        // Sync dropdown selection with clicked seat
+        const newDropdownSelections = {
+          ...selectedSeatsFromDropdown,
+          [selectedDate]: newSeatId || ''
+        };
+        setSelectedSeatsFromDropdown(newDropdownSelections);
+        
         // Also update the main selectedSeat for current date compatibility
         setSelectedSeat(newSeatId);
       }
@@ -312,15 +305,18 @@ export default function Home() {
     if (currentUser && bookings.length > 0) {
       try {
         setBookingError(null);
-        console.log(`🎫 Creating ${bookings.length} bookings for ${currentUser}:`, bookings);
 
         const result = await bookingService.createMultipleBookings(currentUser, bookings);
 
         if (result.success) {
-          console.log(`✅ ${result.bookings?.length || 0} bookings created successfully`);
           
           if (result.failedBookings && result.failedBookings.length > 0) {
-            setBookingError(`Some bookings failed: ${result.error}`);
+            // Check if any failures were due to conflicts
+            const hasConflicts = result.failedBookings.some(msg => msg.includes('Already booked'));
+            const errorMessage = hasConflicts 
+              ? `⚠️ Some seats were taken by other users: ${result.error}`
+              : `Some bookings failed: ${result.error}`;
+            setBookingError(errorMessage);
           }
 
           // Reload user bookings FIRST
@@ -337,10 +333,20 @@ export default function Home() {
           setSelectedSeatsFromClick({});
           setSelectedSeatsFromDropdown({});
           
-          console.log('✅ Bookings created and state refreshed');
         } else {
-          console.log("❌ Booking failed:", result.error);
-          setBookingError(result.error || "Failed to create bookings");
+          
+          // Check if error indicates conflicts and refresh data
+          const isConflictError = result.error?.includes('already taken') || result.error?.includes('Already booked');
+          if (isConflictError) {
+            // Force refresh to show updated seat availability
+            await bookingService.refreshAfterConflict();
+            if (selectedDate) {
+              await handleDateClick(selectedDate);
+            }
+            setBookingError(`${result.error} Data refreshed - please try again with available seats.`);
+          } else {
+            setBookingError(result.error || "Failed to create bookings");
+          }
         }
       } catch (error) {
         console.error("❌ Error creating bookings:", error);
@@ -351,6 +357,8 @@ export default function Home() {
 
   const handleDropdownSelectionChange = (selections: { [date: string]: string }) => {
     setSelectedSeatsFromDropdown(selections);
+    // Sync click selections with dropdown selections to keep them in sync
+    setSelectedSeatsFromClick(selections);
   };
 
   const handleClearBooking = () => {
@@ -387,7 +395,6 @@ export default function Home() {
         userId: booking.userId,
         timeSlot: booking.timeSlot
       }));
-      console.log(`📊 Setting bookedSeatsData for ${dateStr}:`, bookedSeatsData);
       setAllBookingsForDate(bookedSeatsData);
     } catch (err) {
       console.error("Error loading seats for date:", err);
@@ -512,9 +519,16 @@ export default function Home() {
             onDateClick={handleDateClick}
             selectedSeat={selectedSeat || undefined}
             selectedSeatsFromClick={selectedSeatsFromClick}
+            selectedSeatsFromDropdown={selectedSeatsFromDropdown}
             onSubmit={handleReservation}
             onClear={handleClearBooking}
             onDropdownSelectionChange={handleDropdownSelectionChange}
+            onClearClickSelection={(date: string) => {
+              setSelectedSeatsFromClick(prev => ({
+                ...prev,
+                [date]: ''
+              }));
+            }}
             currentUser={currentUser || undefined}
             isAuthenticated={isAuthenticated}
             userBookings={userBookings.filter(b => b.status === 'ACTIVE').map(b => ({ 
@@ -560,6 +574,22 @@ export default function Home() {
           />
         </Box>
       </Box>
+
+      {/* Booking Status Component for conflict errors */}
+      <BookingStatus 
+        bookingError={bookingError}
+        onRetry={() => {
+          setBookingError(null);
+          // Clear selected seat to allow user to select again
+          setSelectedSeat(null);
+        }}
+        onRefresh={async () => {
+          setBookingError(null);
+          if (selectedDate) {
+            await handleDateClick(selectedDate);
+          }
+        }}
+      />
 
       {/* User Authentication Modal */}
       <UserAuthModal

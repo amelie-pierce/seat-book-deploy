@@ -21,6 +21,7 @@ type TimeSlotType = 'AM' | 'PM' | 'FULL_DAY';
 interface ReservationFormProps {
   selectedSeat?: string;
   selectedSeatsFromClick?: { [date: string]: string };
+  selectedSeatsFromDropdown?: { [date: string]: string };
   onSubmit?: (bookings: Array<{ date: string; seatId: string; timeSlot: TimeSlotType }>) => void;
   currentUser?: string;
   isAuthenticated?: boolean;
@@ -30,6 +31,7 @@ interface ReservationFormProps {
   onBookingChange?: () => void;
   onClear?: () => void;
   onDropdownSelectionChange?: (selections: { [date: string]: string }) => void;
+  onClearClickSelection?: (date: string) => void;
   allBookingsForDate?: Array<{
     seatId: string;
     userId: string;
@@ -40,6 +42,7 @@ interface ReservationFormProps {
 export default function ReservationForm({
   selectedSeat,
   selectedSeatsFromClick = {},
+  selectedSeatsFromDropdown: externalSelectedSeatsFromDropdown = {},
   onSubmit,
   currentUser,
   isAuthenticated = false,
@@ -49,6 +52,7 @@ export default function ReservationForm({
   onBookingChange,
   onClear,
   onDropdownSelectionChange,
+  onClearClickSelection,
   allBookingsForDate = []
 }: ReservationFormProps) {
   const [showSuccess, setShowSuccess] = useState(false);
@@ -56,7 +60,27 @@ export default function ReservationForm({
   const [lastSelectedSeat, setLastSelectedSeat] = useState<string | undefined>(undefined);
   const [pendingBookings, setPendingBookings] = useState<{ [date: string]: { seatId: string; timeSlot: TimeSlotType } }>({});
   const [previousUser, setPreviousUser] = useState<string | undefined>(currentUser);
-  const [selectedSeatsFromDropdown, setSelectedSeatsFromDropdown] = useState<{ [date: string]: string }>({});
+  
+  // Use external prop for dropdown selections instead of internal state
+  const selectedSeatsFromDropdown = externalSelectedSeatsFromDropdown;
+  
+  // Helper function to update dropdown selections via parent callback
+  const updateDropdownSelection = useCallback((dateStr: string, seatId: string) => {
+    if (onDropdownSelectionChange) {
+      const newSelections = {
+        ...selectedSeatsFromDropdown,
+        [dateStr]: seatId
+      };
+      onDropdownSelectionChange(newSelections);
+    }
+  }, [onDropdownSelectionChange, selectedSeatsFromDropdown]);
+  
+  // Helper function to clear all dropdown selections
+  const clearAllDropdownSelections = useCallback(() => {
+    if (onDropdownSelectionChange) {
+      onDropdownSelectionChange({});
+    }
+  }, [onDropdownSelectionChange]);
 
   // Get available time slots for a seat on a specific date
   const getAvailableTimeSlots = useCallback((seatId: string, dateStr: string): TimeSlotType[] => {
@@ -168,14 +192,12 @@ export default function ReservationForm({
 
   // Handle seat selection from dropdown
   const handleSeatSelectionFromDropdown = (dateStr: string, seatId: string) => {
-    console.log(`🎯 Seat selected from dropdown: ${seatId} for ${dateStr}`);
     const newSelections = {
       ...selectedSeatsFromDropdown,
       [dateStr]: seatId
     };
-    setSelectedSeatsFromDropdown(newSelections);
     
-    // Notify parent component about dropdown selection changes for visual sync
+    // Notify parent component about dropdown selection changes (parent will update the state)
     if (onDropdownSelectionChange) {
       onDropdownSelectionChange(newSelections);
     }
@@ -198,41 +220,50 @@ export default function ReservationForm({
   };
 
   // Get current seat for a date (either from dropdown, external selection, or existing booking)
-  const getCurrentSeat = (dateStr: string) => {
+  const getCurrentSeat = useCallback((dateStr: string) => {
     // First check if there's an existing booking for this date
     const booking = userBookings.find(b => b.date === dateStr);
     if (booking) {
       return booking.seatId;
     }
     
-    // Check if this is the selected date and we have a seat from external selection
+    // Get the selected time slot for validation
+    const timeSlot = selectedTimeSlots[dateStr];
+    
+    // Since we keep dropdown and click selections in sync, prefer dropdown as the single source of truth
+    if (selectedSeatsFromDropdown[dateStr]) {
+      const dropdownSeat = selectedSeatsFromDropdown[dateStr];
+      // Validate that the dropdown seat is available for the selected time slot
+      if (!timeSlot || getAvailableSeats(dateStr, timeSlot).includes(dropdownSeat)) {
+        return dropdownSeat;
+      }
+    }
+    
+    // Fallback: Check if this is the selected date and we have a seat from external selection
     if (selectedDate === dateStr && selectedSeat) {
-      return selectedSeat;
+      const externalSeat = selectedSeat;
+      // Validate that the external seat is available for the selected time slot
+      if (!timeSlot || getAvailableSeats(dateStr, timeSlot).includes(externalSeat)) {
+        return externalSeat;
+      }
     }
     
-    // Check if there's a seat from clicking on the seating layout for this date
-    if (selectedSeatsFromClick[dateStr]) {
-      return selectedSeatsFromClick[dateStr];
-    }
-    
-    // Otherwise check dropdown selection
-    return selectedSeatsFromDropdown[dateStr] || '';
-  };
+    // Return empty if no valid selection
+    return '';
+  }, [selectedSeatsFromDropdown, selectedSeat, selectedDate, selectedTimeSlots, userBookings, getAvailableSeats]);
 
   // Reset all state when user changes (login/logout)
   const resetAllState = useCallback(() => {
-    console.log('🔄 Resetting ReservationForm state');
     setSelectedTimeSlots({});
     setLastSelectedSeat(undefined);
     setPendingBookings({});
-    setSelectedSeatsFromDropdown({});
+    clearAllDropdownSelections();
     setShowSuccess(false);
-  }, []);
+  }, [clearAllDropdownSelections]);
 
   // Watch for user changes and reset state
   useEffect(() => {
     if (previousUser !== currentUser) {
-      console.log(`👤 User changed from ${previousUser} to ${currentUser} - resetting state`);
       resetAllState();
       setPreviousUser(currentUser);
     }
@@ -241,19 +272,16 @@ export default function ReservationForm({
   // Also reset state when user logs out (becomes unauthenticated)
   useEffect(() => {
     if (!isAuthenticated && (selectedTimeSlots && Object.keys(selectedTimeSlots).length > 0)) {
-      console.log(`🚪 User logged out - resetting state`);
       resetAllState();
     }
   }, [isAuthenticated, selectedTimeSlots, resetAllState]);
 
   // Initialize time slots from user bookings and handle updates
   useEffect(() => {
-    console.log('🔄 Processing userBookings update:', userBookings);
     
     const initialTimeSlots: { [date: string]: TimeSlotType } = {};
     userBookings.forEach(booking => {
       if (booking.timeSlot) {
-        console.log(`📅 Setting time slot from booking: ${booking.date} = ${booking.timeSlot}`);
         initialTimeSlots[booking.date] = booking.timeSlot;
       }
     });
@@ -265,13 +293,8 @@ export default function ReservationForm({
           ...prev,  // Keep existing time slots
           ...initialTimeSlots  // Override/add with authoritative booking data
         };
-        console.log('🎯 Updated selectedTimeSlots (preserving existing):', newState);
-        console.log('🎯 Previous state was:', prev);
-        console.log('🎯 Booking data adds:', initialTimeSlots);
         return newState;
       });
-    } else if (userBookings.length === 0) {
-      console.log('⏸️ No user bookings and no time slots to add - keeping current state');
     }
   }, [userBookings]);
 
@@ -285,7 +308,6 @@ export default function ReservationForm({
       if (seatId && timeSlot) {
         const existingBooking = userBookings.find(b => b.date === date && b.seatId === seatId);
         if (!existingBooking) {
-          console.log(`📝 Storing pending booking from dropdown: ${seatId} on ${date} (${timeSlot})`);
           newPendingBookings[date] = {
             seatId,
             timeSlot
@@ -307,19 +329,16 @@ export default function ReservationForm({
         setLastSelectedSeat(selectedSeat);
         
         const availableSlots = getAvailableTimeSlots(selectedSeat, selectedDate);
-        console.log(`🎯 Seat changed to ${selectedSeat} for ${selectedDate}. Available slots:`, availableSlots);
         
         // Check if there's already a user booking for this date
         const existingBooking = userBookings.find(b => b.date === selectedDate);
         if (existingBooking) {
-          console.log(`📌 User already has booking for ${selectedDate}:`, existingBooking);
           return;
         }
         
         // Check if there's a pending booking for this date
         const pendingBooking = pendingBookings[selectedDate];
         if (pendingBooking && pendingBooking.seatId === selectedSeat) {
-          console.log(`📌 Restoring pending booking for ${selectedDate}:`, pendingBooking);
           setSelectedTimeSlots(prev => ({
             ...prev,
             [selectedDate]: pendingBooking.timeSlot
@@ -330,7 +349,6 @@ export default function ReservationForm({
         // Auto-select appropriate time slot when seat changes based on availability
         if (availableSlots.length === 3 && availableSlots.includes('FULL_DAY')) {
           // If no one has booked any time slots, default to FULL_DAY
-          console.log(`🔄 Fully available seat - auto-selecting FULL_DAY`);
           setSelectedTimeSlots(prev => ({
             ...prev,
             [selectedDate]: 'FULL_DAY'
@@ -338,7 +356,6 @@ export default function ReservationForm({
         } else if (availableSlots.length === 1) {
           // Only one slot available (someone booked AM, only PM left OR someone booked PM, only AM left)
           const onlyAvailableSlot = availableSlots[0];
-          console.log(`🔄 One slot available - auto-selecting: ${onlyAvailableSlot}`);
           setSelectedTimeSlots(prev => ({
             ...prev,
             [selectedDate]: onlyAvailableSlot
@@ -346,13 +363,10 @@ export default function ReservationForm({
         } else if (availableSlots.length === 2) {
           // This should not normally happen with current logic, but handle just in case
           const nonFullDaySlot = availableSlots.find(slot => slot !== 'FULL_DAY') || availableSlots[0];
-          console.log(`🔄 Two slots available - auto-selecting: ${nonFullDaySlot}`);
           setSelectedTimeSlots(prev => ({
             ...prev,
             [selectedDate]: nonFullDaySlot
           }));
-        } else {
-          console.log(`⚠️ No available time slots for seat ${selectedSeat} on ${selectedDate}`);
         }
       }
     }
@@ -369,11 +383,9 @@ export default function ReservationForm({
         }
 
         const availableSlots = getAvailableTimeSlots(seatId, dateStr);
-        console.log(`🎯 Auto-selecting time slot for clicked seat ${seatId} on ${dateStr}. Available slots:`, availableSlots);
         
         if (availableSlots.length === 3 && availableSlots.includes('FULL_DAY')) {
           // If no one has booked any time slots, default to FULL_DAY
-          console.log(`🔄 Fully available clicked seat - auto-selecting FULL_DAY`);
           setSelectedTimeSlots(prev => ({
             ...prev,
             [dateStr]: 'FULL_DAY'
@@ -381,7 +393,6 @@ export default function ReservationForm({
         } else if (availableSlots.length === 1) {
           // Only one slot available
           const onlyAvailableSlot = availableSlots[0];
-          console.log(`🔄 One slot available for clicked seat - auto-selecting: ${onlyAvailableSlot}`);
           setSelectedTimeSlots(prev => ({
             ...prev,
             [dateStr]: onlyAvailableSlot
@@ -389,7 +400,6 @@ export default function ReservationForm({
         } else if (availableSlots.length === 2) {
           // Two slots available, prefer non-FULL_DAY
           const nonFullDaySlot = availableSlots.find(slot => slot !== 'FULL_DAY') || availableSlots[0];
-          console.log(`🔄 Two slots available for clicked seat - auto-selecting: ${nonFullDaySlot}`);
           setSelectedTimeSlots(prev => ({
             ...prev,
             [dateStr]: nonFullDaySlot
@@ -399,43 +409,59 @@ export default function ReservationForm({
     });
   }, [selectedSeatsFromClick, selectedTimeSlots, userBookings, getAvailableTimeSlots]);
 
-
+  // Validate seat selections when time slots or available seats change
+  useEffect(() => {
+    Object.entries(selectedTimeSlots).forEach(([dateStr, timeSlot]) => {
+      if (!timeSlot) return;
+      
+      const availableSeats = getAvailableSeats(dateStr, timeSlot);
+      
+      // Check and clear invalid dropdown selections (which also clears click selections since they're synced)
+      if (selectedSeatsFromDropdown[dateStr] && !availableSeats.includes(selectedSeatsFromDropdown[dateStr])) {
+        updateDropdownSelection(dateStr, '');
+        // Also clear click selection in parent component
+        if (onClearClickSelection) {
+          onClearClickSelection(dateStr);
+        }
+      }
+    });
+  }, [selectedTimeSlots, selectedSeatsFromDropdown, getAvailableSeats, onClearClickSelection, updateDropdownSelection]);
 
   const handleTimeSlotChange = (date: string, timeSlot: TimeSlotType) => {
-    console.log(`Setting time slot for ${date} to ${timeSlot}`);
     setSelectedTimeSlots(prev => ({
       ...prev,
       [date]: timeSlot
     }));
+    
+    // Clear seat selections that are not available for the new time slot
+    const availableSeats = getAvailableSeats(date, timeSlot);
+    
+    // Clear both dropdown and click selections if not available for this time slot (they're kept in sync)
+    if (selectedSeatsFromDropdown[date] && !availableSeats.includes(selectedSeatsFromDropdown[date])) {
+      updateDropdownSelection(date, '');
+      // Also clear click selection in parent
+      if (onClearClickSelection) {
+        onClearClickSelection(date);
+      }
+    }
   };
 
   const getTimeSlotForDate = (dateStr: string) => {
     // First check if there's an existing booking
     const existingBooking = userBookings.find(b => b.date === dateStr);
     if (existingBooking?.timeSlot) {
-      console.log(`⚡ Time slot from existing booking for ${dateStr}: ${existingBooking.timeSlot}`);
       return existingBooking.timeSlot;
     }
     // Then check if there's a selected time slot (only if it's not null/undefined)
     if (selectedTimeSlots[dateStr]) {
-      console.log(`⚡ Time slot from state for ${dateStr}: ${selectedTimeSlots[dateStr]}`);
       return selectedTimeSlots[dateStr];
     }
     // Return empty string if no booking or selection exists (before seat is clicked)
-    console.log(`⚡ No time slot found for ${dateStr}`);
     return '';
   };
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    
-    console.log('🚀 Starting submission process...');
-    console.log('📊 Current state:');
-    console.log('  selectedSeatsFromDropdown:', selectedSeatsFromDropdown);
-    console.log('  selectedSeatsFromClick:', selectedSeatsFromClick);
-    console.log('  selectedTimeSlots:', selectedTimeSlots);
-    console.log('  selectedSeat (current):', selectedSeat);
-    console.log('  selectedDate:', selectedDate);
     
     // Collect all bookings from all sources
     const allBookings: Array<{ date: string; seatId: string; timeSlot: TimeSlotType }> = [];
@@ -445,7 +471,6 @@ export default function ReservationForm({
     Object.entries(selectedSeatsFromDropdown).forEach(([date, seatId]) => {
       const timeSlot = selectedTimeSlots[date];
       if (seatId && timeSlot) {
-        console.log(`📊 Counting dropdown booking: ${seatId} on ${date} (${timeSlot})`);
         allBookings.push({ date, seatId, timeSlot });
         processedDates.add(date);
       }
@@ -455,7 +480,6 @@ export default function ReservationForm({
     Object.entries(selectedSeatsFromClick).forEach(([date, seatId]) => {
       const timeSlot = selectedTimeSlots[date];
       if (seatId && timeSlot && !processedDates.has(date)) {
-        console.log(`📊 Counting clicked booking: ${seatId} on ${date} (${timeSlot})`);
         allBookings.push({ date, seatId, timeSlot });
         processedDates.add(date);
       }
@@ -463,7 +487,6 @@ export default function ReservationForm({
     
     // 3. Add current seat selection if it exists and not already processed
     if (selectedSeat && selectedDate && selectedTimeSlots[selectedDate] && !processedDates.has(selectedDate)) {
-      console.log(`📊 Counting current booking: ${selectedSeat} on ${selectedDate} (${selectedTimeSlots[selectedDate]})`);
       allBookings.push({
         date: selectedDate,
         seatId: selectedSeat,
@@ -471,24 +494,15 @@ export default function ReservationForm({
       });
     }
     
-    console.log(`📊 Total bookings ready: ${allBookings.length}`);
-    console.log('📊 All bookings:', allBookings);
-    
     if (onSubmit && allBookings.length > 0) {
       onSubmit(allBookings);
       
       // Clear dropdown selections after submission
-      setSelectedSeatsFromDropdown({});
+      clearAllDropdownSelections();
       setPendingBookings({});
-      
-      // Notify parent about clearing dropdown selections
-      if (onDropdownSelectionChange) {
-        onDropdownSelectionChange({});
-      }
       
       // DON'T clear time slots for newly booked dates - they will become actual bookings
       // The time slots will be preserved and updated when userBookings refreshes
-      console.log('✅ Keeping time slots for newly booked dates - they will become actual bookings');
       
       // Note: selectedSeatsFromClick is managed by the parent component
     }
@@ -690,7 +704,11 @@ export default function ReservationForm({
                     </FormControl>
                     <FormControl size="small" sx={{ minWidth: 150 }}>
                       <Select
-                        value={getCurrentSeat(dateStr)}
+                        key={`seat-${dateStr}-${getCurrentSeat(dateStr)}-${selectedTimeSlots[dateStr] || 'no-slot'}`}
+                        value={(() => {
+                          const currentSeat = getCurrentSeat(dateStr);
+                          return currentSeat;
+                        })()}
                         onChange={(e) => handleSeatSelectionFromDropdown(dateStr, e.target.value as string)}
                         displayEmpty
                         variant="outlined"

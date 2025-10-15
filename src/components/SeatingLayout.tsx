@@ -266,12 +266,12 @@ export default function SeatingLayout({ onSeatClick, availableSeats, selectedSea
                           availableSeats={availableSeats}
                           selectedSeat={(() => {
                             // Determine the effective selected seat for visual highlighting
-                            // Priority: 1. Clicked seat, 2. Dropdown selection for current date
-                            if (selectedSeat) {
-                              return selectedSeat;
-                            }
+                            // Priority: 1. Dropdown selection for current date, 2. Clicked seat
                             if (selectedDate && selectedSeatsFromDropdown[selectedDate]) {
                               return selectedSeatsFromDropdown[selectedDate];
+                            }
+                            if (selectedSeat) {
+                              return selectedSeat;
                             }
                             return undefined;
                           })()}

@@ -10,7 +10,7 @@ import {
   getReservedSeatsForDate,
   getTodayDate
 } from '../utils/bookingStorage';
-import { vercelDataService } from './vercelDataService';
+import { vercelDataService, SeatConflictError } from './vercelDataService';
 
 export class BookingService {
   private cachedBookings: BookingRecord[] = [];
@@ -19,12 +19,10 @@ export class BookingService {
   // Initialize database connection and load all data
   async initializeDatabase(): Promise<void> {
     if (this.isInitialized) {
-      console.log('📊 Database already initialized - skipping (cache hit)');
       return;
     }
     
     try {
-      console.log('📊 Initializing booking database...');
       
       // Initialize Vercel data service (will only make API call if not already initialized)
       await vercelDataService.initialize();
@@ -35,7 +33,6 @@ export class BookingService {
       this.cachedBookings = reservationBookings;
       
       this.isInitialized = true;
-      console.log(`📊 Database initialized with ${this.cachedBookings.length} records`);
     } catch (error) {
       console.error('❌ Error initializing database:', error);
       this.cachedBookings = [];
@@ -45,11 +42,9 @@ export class BookingService {
 
   // Refresh data from API
   async refreshFromCsv(): Promise<void> {
-    console.log('🔄 Refreshing booking data from API...');
     
     // Make sure we're initialized first, but don't force a refresh if we just initialized
     if (!this.isInitialized) {
-      console.log('🔄 Not initialized yet, initializing instead of refreshing...');
       await this.initializeDatabase();
       return;
     }
@@ -59,7 +54,11 @@ export class BookingService {
     // Get fresh bookings (no need to re-initialize since refreshFromApi already loaded fresh data)
     const reservationBookings = await vercelDataService.getBookingsFromReservations();
     this.cachedBookings = reservationBookings;
-    console.log(`🔄 Data refreshed with ${this.cachedBookings.length} records`);
+  }
+
+  // Force refresh after a booking conflict to get latest state
+  async refreshAfterConflict(): Promise<void> {
+    await this.refreshFromCsv();
   }
 
   // Load user-specific data on app open
@@ -75,8 +74,6 @@ export class BookingService {
       b.status === 'ACTIVE'
     );
     const todayBooking = getUserBookingForDate(this.cachedBookings, userId, getTodayDate());
-    
-    console.log(`👤 Loaded user data for ${userId}: ${userBookings.length} bookings`);
     
     return {
       userBookings,
@@ -146,28 +143,48 @@ export class BookingService {
         };
       }
 
-      // Save all valid bookings
+      // Save all valid bookings with individual conflict detection
+      const successfulBookings: BookingRecord[] = [];
+      
       for (const booking of createdBookings) {
-        // Add to cache
-        this.cachedBookings.push(booking);
-        
-        // Save to CSV data service for persistence
-        await vercelDataService.saveBookingAsReservation(booking);
+        try {
+          // Add to cache optimistically
+          this.cachedBookings.push(booking);
+          
+          // Save to API with conflict detection
+          await vercelDataService.saveBookingAsReservation(booking);
+          successfulBookings.push(booking);
+          
+        } catch (error) {
+          // Remove from cache if save failed
+          const index = this.cachedBookings.indexOf(booking);
+          if (index > -1) {
+            this.cachedBookings.splice(index, 1);
+          }
+          
+          // Handle seat conflict
+          if (error instanceof SeatConflictError) {
+            failedBookings.push(`Seat ${booking.seatId} on ${booking.date}: Already booked by another user`);
+          } else {
+            failedBookings.push(`Seat ${booking.seatId} on ${booking.date}: Save failed`);
+          }
+        }
       }
 
-      console.log(`✅ ${createdBookings.length} bookings created successfully${failedBookings.length > 0 ? ` (${failedBookings.length} failed)` : ''}`);
-      
+      const hasSuccess = successfulBookings.length > 0;
+      const hasFailures = failedBookings.length > 0;
+
       return { 
-        success: true, 
-        bookings: createdBookings,
-        ...(failedBookings.length > 0 && { 
+        success: hasSuccess,
+        bookings: successfulBookings,
+        ...(hasFailures && { 
           error: `Some bookings failed: ${failedBookings.join('; ')}`,
           failedBookings 
         })
       };
     } catch (error) {
-      console.error('❌ Error creating multiple bookings:', error);
-      return { success: false, error: 'Failed to create bookings' };
+      console.error('❌ Error in batch booking operation:', error);
+      return { success: false, error: 'Failed to process bookings' };
     }
   }
 
@@ -221,17 +238,43 @@ export class BookingService {
         tableNumber: seatId.charAt(0), // Extract table letter
       };
 
-      // Add to cache and save to CSV data service
-      this.cachedBookings.push(newBooking);
-      
-      // Save to CSV data service for persistence
-      await vercelDataService.saveBookingAsReservation(newBooking);
+      try {
+        // Add to cache and save to API with conflict detection
+        this.cachedBookings.push(newBooking);
+        await vercelDataService.saveBookingAsReservation(newBooking);
 
-      console.log(`✅ New booking created and saved to CSV: ${userId} -> ${seatId} (${timeSlot}) on ${bookingDate}`);
-      return { success: true, booking: newBooking };
+        return { success: true, booking: newBooking };
+        
+      } catch (saveError) {
+        // Remove from cache if save failed
+        const index = this.cachedBookings.indexOf(newBooking);
+        if (index > -1) {
+          this.cachedBookings.splice(index, 1);
+        }
+
+        // Handle specific seat conflict error
+        if (saveError instanceof SeatConflictError) {
+          console.error('⚠️ Seat booking conflict detected:', saveError.message);
+          return { 
+            success: false, 
+            error: `Seat already taken! ${saveError.message}. Please refresh and choose another seat.`
+          };
+        }
+
+        throw saveError; // Re-throw to be caught by outer catch
+      }
     } catch (error) {
+      // Handle specific seat conflict error
+      if (error instanceof SeatConflictError) {
+        console.error('⚠️ Seat booking conflict detected:', error.message);
+        return { 
+          success: false, 
+          error: `Seat already taken! ${error.message}. Please refresh and choose another seat.`
+        };
+      }
+
       console.error('❌ Error creating booking:', error);
-      return { success: false, error: 'Failed to create booking' };
+      return { success: false, error: 'Failed to create booking. Please try again.' };
     }
   }
 
@@ -257,7 +300,6 @@ export class BookingService {
       // Delete from CSV data service
       await vercelDataService.deleteReservation(bookingId);
 
-      console.log(`❌ Booking cancelled in CSV: ${bookingId} by ${userId}`);
       return { success: true };
     } catch (error) {
       console.error('❌ Error cancelling booking:', error);
