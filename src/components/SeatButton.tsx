@@ -1,3 +1,4 @@
+import React from "react";
 import { Box, IconButton, Typography } from "@mui/material";
 
 interface SeatButtonProps {
@@ -17,7 +18,7 @@ interface SeatButtonProps {
   };
 }
 
-export default function SeatButton({
+function SeatButton({
   position,
   leftPosition,
   onClick,
@@ -139,3 +140,5 @@ export default function SeatButton({
     </IconButton>
   );
 }
+
+export default React.memo(SeatButton);
