@@ -9,6 +9,23 @@ import {
   bookingToReservation
 } from '../utils/bookingStorage';
 
+// Custom error types for booking conflicts
+export class SeatConflictError extends Error {
+  code = 'SEAT_CONFLICT';
+  conflictDetails?: {
+    seat: string;
+    date: string;
+    timeSlot: string;
+    bookedBy: string;
+  };
+
+  constructor(message: string, conflictDetails?: SeatConflictError['conflictDetails']) {
+    super(message);
+    this.name = 'SeatConflictError';
+    this.conflictDetails = conflictDetails;
+  }
+}
+
 export class VercelDataService {
   private baseUrl: string;
   private cachedUsers: User[] = [];
@@ -25,17 +42,13 @@ export class VercelDataService {
 
   // Initialize service by loading data from API endpoints
   async initialize(): Promise<void> {
-    console.log('🔍 initialize() called from:', new Error().stack?.split('\n')[2]?.trim());
-    console.log('🔍 React StrictMode detected:', typeof window !== 'undefined' && window.React && window.React.version);
     
     if (this.isInitialized) {
-      console.log('📊 Vercel service already initialized - skipping API call');
       return;
     }
 
     // If initialization is already in progress, wait for it
     if (this.initializationPromise) {
-      console.log('⏳ Initialization already in progress - waiting...');
       return this.initializationPromise;
     }
 
@@ -51,13 +64,10 @@ export class VercelDataService {
 
   private async performInitialization(): Promise<void> {
     try {
-      console.log('📊 Initializing Vercel data service...');
-      
       // Load initial data from API endpoints
       await this.loadFromApi();
       
       this.isInitialized = true;
-      console.log(`📊 Vercel service initialized with ${this.cachedUsers.length} users and ${this.cachedReservations.length} reservations`);
     } catch (error) {
       console.error('❌ Error initializing Vercel service:', error);
       this.cachedUsers = [];
@@ -70,17 +80,12 @@ export class VercelDataService {
   private async loadFromApi(): Promise<void> {
     const now = Date.now();
     
-    // Add stack trace to see WHO is calling this
-    console.log('🔍 loadFromApi() called from:', new Error().stack?.split('\n')[2]?.trim());
-    
     // Check if we recently loaded data (within cache duration)
     if (this.isInitialized && (now - this.lastApiCall) < this.CACHE_DURATION) {
-      console.log(`⚡ Using cached data (${Math.round((now - this.lastApiCall)/1000)}s old) - skipping API call`);
       return;
     }
 
     try {
-      console.log('📡 Making API calls to load fresh data...');
       
       // Load users from API
       const usersResponse = await fetch(`${this.baseUrl}/api/users`);
@@ -99,12 +104,8 @@ export class VercelDataService {
       this.cachedReservations = reservationsData.reservations || [];
 
       this.lastApiCall = now;
-      console.log('📄 Loaded fresh data from API endpoints');
-      console.log(`👥 Loaded ${this.cachedUsers.length} users`);
-      console.log(`🎫 Loaded ${this.cachedReservations.length} reservations`);
     } catch (error) {
       console.error('❌ Error loading from API endpoints:', error);
-      console.log('ℹ️ Starting with empty data - this is normal for first deployment');
       
       // Initialize with empty data instead of throwing error
       this.cachedUsers = [];
@@ -114,11 +115,9 @@ export class VercelDataService {
 
   // Refresh data by re-reading from API (forces fresh API call)
   async refreshFromApi(): Promise<void> {
-    console.log('🔄 Force refreshing data from API...');
     // Reset timestamp to force fresh API call
     this.lastApiCall = 0;
     await this.loadFromApi();
-    console.log(`🔄 Data refreshed: ${this.cachedUsers.length} users, ${this.cachedReservations.length} reservations`);
   }
 
   // Get all users (assumes service is already initialized)
@@ -133,10 +132,7 @@ export class VercelDataService {
     if (!this.isInitialized) {
       await this.initialize();
     }
-    console.log(`🔍 Looking for user: "${userId}"`);
-    console.log(`📋 Available users:`, this.cachedUsers.map(u => u.user_id));
     const foundUser = this.cachedUsers.find(user => user.user_id === userId) || null;
-    console.log(`${foundUser ? '✅' : '❌'} User ${userId} ${foundUser ? 'found' : 'not found'}`);
     return foundUser;
   }
 
@@ -171,8 +167,6 @@ export class VercelDataService {
       } else {
         this.cachedUsers.push(user);
       }
-
-      console.log(`✅ User saved via API: ${user.user_id}`);
     } catch (error) {
       console.error('❌ Error saving user via API:', error);
       throw error;
@@ -191,7 +185,7 @@ export class VercelDataService {
     return reservations.map(reservation => reservationToBooking(reservation));
   }
 
-  // Save booking as reservation via API
+  // Save booking as reservation via API with conflict detection
   async saveBookingAsReservation(booking: BookingRecord): Promise<void> {
     try {
       const reservation = bookingToReservation(booking);
@@ -204,19 +198,29 @@ export class VercelDataService {
         body: JSON.stringify({ reservation }),
       });
 
+      const responseData = await response.json();
+
       if (!response.ok) {
-        throw new Error(`Failed to save reservation: ${response.status}`);
+        // Handle specific conflict error
+        if (response.status === 409 && responseData.error === 'SEAT_ALREADY_BOOKED') {
+          const conflictError = new SeatConflictError(
+            responseData.message || 'Seat is already booked by another user',
+            responseData.conflictDetails
+          );
+          throw conflictError;
+        }
+        
+        // Handle other errors
+        throw new Error(`Failed to save reservation: ${response.status} - ${responseData.message || 'Unknown error'}`);
       }
 
-      // Update local cache
+      // Update local cache on successful save
       const existingIndex = this.cachedReservations.findIndex(r => r.reservation_id === reservation.reservation_id);
       if (existingIndex >= 0) {
         this.cachedReservations[existingIndex] = reservation;
       } else {
         this.cachedReservations.push(reservation);
       }
-
-      console.log(`✅ Reservation saved via API: ${reservation.reservation_id}`);
     } catch (error) {
       console.error('❌ Error saving reservation via API:', error);
       throw error;
@@ -225,23 +229,33 @@ export class VercelDataService {
 
   // Delete reservation via API
   async deleteReservation(reservationId: string): Promise<void> {
+    if (!reservationId || reservationId.trim() === '') {
+      throw new Error('Reservation ID is required for deletion');
+    }
+    
     try {
-      const response = await fetch(`${this.baseUrl}/api/reservations`, {
+      const deleteUrl = `${this.baseUrl}/api/reservations?id=${encodeURIComponent(reservationId)}`;
+      
+      const response = await fetch(deleteUrl, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ reservation_id: reservationId }),
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to delete reservation: ${response.status}`);
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText || 'Unknown error' };
+        }
+        throw new Error(`Failed to delete reservation: ${response.status} - ${errorData.error || errorText}`);
       }
 
       // Update local cache
       this.cachedReservations = this.cachedReservations.filter(r => r.reservation_id !== reservationId);
-
-      console.log(`✅ Reservation deleted via API: ${reservationId}`);
     } catch (error) {
       console.error('❌ Error deleting reservation via API:', error);
       throw error;

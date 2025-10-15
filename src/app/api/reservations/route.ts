@@ -1,45 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ReservationRecord } from '../../../utils/bookingStorage';
-import { promises as fs } from 'fs';
-import path from 'path';
 
-// File path for persistent storage (Vercel allows /tmp directory writes)
-const TEMP_FILE_PATH = path.join('/tmp', 'reservations.json');
-
-// In-memory cache for performance
-let inMemoryReservations: ReservationRecord[] = [];
-let isLoaded = false;
-
-// Load reservations from persistent storage
-async function loadReservations(): Promise<void> {
-  if (isLoaded) return;
-  
-  try {
-    const data = await fs.readFile(TEMP_FILE_PATH, 'utf-8');
-    inMemoryReservations = JSON.parse(data);
-    console.log(`📂 Loaded ${inMemoryReservations.length} reservations from persistent storage`);
-  } catch {
-    // File doesn't exist or is corrupted, start with empty array
-    console.log('📂 No existing reservations file, starting fresh');
-    inMemoryReservations = [];
-  }
-  isLoaded = true;
-}
-
-// Save reservations to persistent storage
-async function saveReservations(): Promise<void> {
-  try {
-    await fs.writeFile(TEMP_FILE_PATH, JSON.stringify(inMemoryReservations, null, 2));
-    console.log(`💾 Saved ${inMemoryReservations.length} reservations to persistent storage`);
-  } catch (error) {
-    console.error('❌ Error saving reservations:', error);
-  }
-}
+// In-memory storage for Vercel deployment (persists during function lifetime)
+// This will reset between cold starts but that's acceptable for demo purposes
+const inMemoryReservations: ReservationRecord[] = [];
 
 export async function GET() {
   try {
-    await loadReservations();
-    console.log(`📊 GET /api/reservations - returning ${inMemoryReservations.length} reservations`);
     return NextResponse.json({ 
       success: true, 
       reservations: inMemoryReservations,
@@ -56,11 +23,33 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    await loadReservations();
     const { reservation }: { reservation: ReservationRecord } = await request.json();
-    console.log('📝 POST /api/reservations - Adding reservation:', reservation);
 
-    // Check if reservation already exists (update) or is new
+    // 🛡️ CONFLICT DETECTION: Check if another user already booked this seat+date+timeslot
+    const conflictingReservation = inMemoryReservations.find(r => 
+      r.table_id === reservation.table_id &&
+      r.date === reservation.date &&
+      r.slot_type === reservation.slot_type &&
+      r.user_id !== reservation.user_id &&  // Different user
+      r.reservation_id !== reservation.reservation_id // Different reservation
+    );
+
+    if (conflictingReservation) {
+      console.log(`❌ CONFLICT: Seat ${reservation.table_id} on ${reservation.date} (${reservation.slot_type}) already booked by user ${conflictingReservation.user_id}`);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'SEAT_ALREADY_BOOKED',
+        message: `This seat is already booked by another user`,
+        conflictDetails: {
+          seat: reservation.table_id,
+          date: reservation.date,
+          timeSlot: reservation.slot_type,
+          bookedBy: conflictingReservation.user_id
+        }
+      }, { status: 409 }); // 409 Conflict
+    }
+
+    // Check if this user's reservation already exists (update scenario)
     const existingIndex = inMemoryReservations.findIndex(r => r.reservation_id === reservation.reservation_id);
     
     if (existingIndex >= 0) {
@@ -71,7 +60,6 @@ export async function POST(request: NextRequest) {
       console.log(`➕ Added new reservation ${reservation.reservation_id}`);
     }
 
-    await saveReservations();
     console.log(`✅ Reservation ${reservation.reservation_id} saved successfully. Total reservations: ${inMemoryReservations.length}`);
     return NextResponse.json({ 
       success: true, 
@@ -89,7 +77,6 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    await loadReservations();
     const { searchParams } = new URL(request.url);
     const reservationId = searchParams.get('id');
     
@@ -117,7 +104,6 @@ export async function DELETE(request: NextRequest) {
     // Update the in-memory array
     inMemoryReservations.splice(0, inMemoryReservations.length, ...updatedReservations);
     
-    await saveReservations();
     console.log(`✅ Reservation ${reservationId} deleted successfully. Remaining: ${inMemoryReservations.length}`);
     return NextResponse.json({ 
       success: true, 
@@ -128,7 +114,7 @@ export async function DELETE(request: NextRequest) {
     console.error('Error deleting reservation:', error);
     return NextResponse.json({ 
       success: false, 
-      error: 'Failed to delete reservation' 
+      error: `Failed to delete reservation: ${error instanceof Error ? error.message : 'Unknown error'}` 
     }, { status: 500 });
   }
 }
