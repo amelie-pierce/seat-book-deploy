@@ -12,18 +12,10 @@ import {
   CardContent,
   CardActions
 } from '@mui/material';
-import { Person as PersonIcon, Chair as ChairIcon } from '@mui/icons-material';
+import { Person as PersonIcon } from '@mui/icons-material';
 import { vercelDataService } from '../../services/vercelDataService';
 
-interface AuthPageProps {
-  selectedSeat?: string;
-  onUserConfirmed?: (userId: string) => void;
-}
-
-export default function AuthPage({ 
-  selectedSeat, 
-  onUserConfirmed 
-}: AuthPageProps = {}) {
+export default function AuthPage() {
   const [userId, setUserId] = useState('');
   const [error, setError] = useState('');
   const [isExistingUser, setIsExistingUser] = useState(false);
@@ -33,15 +25,11 @@ export default function AuthPage({
   // Check if user is already authenticated on component mount
   useEffect(() => {
     const storedUserId = localStorage.getItem('seatBookingUserId');
-    if (storedUserId && onUserConfirmed) {
-      // If already authenticated and we have a callback, call it and redirect
-      onUserConfirmed(storedUserId);
-      router.push('/');
-    } else if (storedUserId && !onUserConfirmed) {
-      // If already authenticated but no callback, just redirect
+    if (storedUserId) {
+      // If already authenticated, redirect to home
       router.push('/');
     }
-  }, [onUserConfirmed, router]);
+  }, [router]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -69,10 +57,6 @@ export default function AuthPage({
         
         // Store user ID in localStorage
         localStorage.setItem('seatBookingUserId', trimmedUserId);
-        
-        if (onUserConfirmed) {
-          onUserConfirmed(trimmedUserId);
-        }
         
         // Navigate back to main page
         router.push('/');
@@ -113,10 +97,6 @@ export default function AuthPage({
     }
   };
 
-  const handleBackToBooking = () => {
-    router.push('/');
-  };
-
   return (
     <Container 
       maxWidth="sm" 
@@ -155,17 +135,6 @@ export default function AuthPage({
         </Box>
 
         <CardContent sx={{ px: 4, py: 4 }}>
-          {/* Selected Seat Alert */}
-          {selectedSeat && (
-            <Alert 
-              severity="info" 
-              sx={{ mb: 3, borderRadius: 2 }}
-              icon={<ChairIcon />}
-            >
-              You&apos;re about to reserve seat: <strong>{selectedSeat}</strong>
-            </Alert>
-          )}
-
           {/* Welcome Message */}
           <Typography variant="h6" gutterBottom sx={{ fontWeight: 500 }}>
             User Authentication Required
@@ -226,24 +195,8 @@ export default function AuthPage({
               fontWeight: 600
             }}
           >
-            {selectedSeat ? 'Continue to Booking' : 'Get Started'}
+            Get Started
           </Button>
-          
-          {selectedSeat && (
-            <Button 
-              onClick={handleBackToBooking}
-              color="inherit"
-              variant="outlined"
-              fullWidth
-              size="large"
-              sx={{ 
-                py: 1.5,
-                borderRadius: 2
-              }}
-            >
-              Back to Seat Selection
-            </Button>
-          )}
         </CardActions>
       </Card>
     </Container>
