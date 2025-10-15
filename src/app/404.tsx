@@ -1,5 +1,5 @@
 'use client';
-import { Container, Box, Typography, Button, Alert } from '@mui/material';
+import { Container, Box, Typography, Button } from '@mui/material';
 import { ErrorOutline as ErrorIcon, Home as HomeIcon } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 

@@ -1,4 +1,6 @@
 import { Box, Paper, Typography } from '@mui/material';
+import { useMemo, useCallback } from 'react';
+import React from 'react';
 import SeatButton from './SeatButton';
 
 interface TableProps {
@@ -17,12 +19,11 @@ interface TableProps {
   }>;
 }
 
-export default function Table({ 
+function Table({ 
   width = 240, 
   height = 80, 
   onSeatClick, 
   tableLetter,
-  availableSeats = [], // Keep for interface compatibility but not used in new logic
   selectedSeat,
   timeSlot,
   currentUser,
@@ -32,87 +33,136 @@ export default function Table({
   if (tableLetter === 'C') {
     console.log(`🔍 Table C Debug: bookedSeats=`, bookedSeats, `currentUser=${currentUser}`);
   }
+  
   const seatPositions = ['20%', '50%', '80%'];
   
-  const handleSeatClick = (seatNumber: number) => {
+  // Memoize seat availability calculations to avoid recalculating on every render
+  const seatAvailabilityMap = useMemo(() => {
+    const availabilityMap = new Map<number, boolean>();
+    
+    for (let seatNumber = 1; seatNumber <= 6; seatNumber++) {
+      const seatId = `${tableLetter}${seatNumber}`;
+      
+      // Find all bookings for this seat
+      const seatBookings = bookedSeats.filter(b => b.seatId === seatId);
+      
+      // If no bookings, seat is available
+      if (seatBookings.length === 0) {
+        availabilityMap.set(seatNumber, true);
+        continue;
+      }
+      
+      // Check for FULL_DAY bookings - if any exist, seat is not available
+      const hasFullDayBooking = seatBookings.some(booking => booking.timeSlot === 'FULL_DAY');
+      if (hasFullDayBooking) {
+        availabilityMap.set(seatNumber, false);
+        continue;
+      }
+      
+      // Check if both AM and PM are booked by different users
+      const amBooking = seatBookings.find(booking => booking.timeSlot === 'AM');
+      const pmBooking = seatBookings.find(booking => booking.timeSlot === 'PM');
+      
+      if (amBooking && pmBooking && amBooking.userId !== pmBooking.userId) {
+        // Both AM and PM booked by different users - not available
+        availabilityMap.set(seatNumber, false);
+      } else {
+        // If only AM or only PM is booked, or both are booked by same user, seat is still available
+        availabilityMap.set(seatNumber, true);
+      }
+    }
+    
+    return availabilityMap;
+  }, [tableLetter, bookedSeats]);
+
+  // Memoize time slot status calculations
+  const timeSlotStatusMap = useMemo(() => {
+    const statusMap = new Map<number, {
+      amBooked: boolean;
+      pmBooked: boolean;
+      amIsCurrentUser: boolean;
+      pmIsCurrentUser: boolean;
+    }>();
+    
+    for (let seatNumber = 1; seatNumber <= 6; seatNumber++) {
+      const seatId = `${tableLetter}${seatNumber}`;
+      const seatBookings = bookedSeats.filter(b => b.seatId === seatId);
+      
+      // Initialize status
+      let amBooked = false;
+      let pmBooked = false;
+      let amIsCurrentUser = false;
+      let pmIsCurrentUser = false;
+      
+      // Check each booking for this seat
+      seatBookings.forEach(booking => {
+        const isCurrentUserBooking = booking.userId === currentUser;
+        
+        if (booking.timeSlot === 'FULL_DAY') {
+          amBooked = true;
+          pmBooked = true;
+          amIsCurrentUser = isCurrentUserBooking;
+          pmIsCurrentUser = isCurrentUserBooking;
+        } else if (booking.timeSlot === 'AM') {
+          amBooked = true;
+          amIsCurrentUser = isCurrentUserBooking;
+        } else if (booking.timeSlot === 'PM') {
+          pmBooked = true;
+          pmIsCurrentUser = isCurrentUserBooking;
+        }
+      });
+      
+      statusMap.set(seatNumber, {
+        amBooked,
+        pmBooked,
+        amIsCurrentUser,
+        pmIsCurrentUser
+      });
+    }
+    
+    return statusMap;
+  }, [tableLetter, bookedSeats, currentUser]);
+
+  const handleSeatClick = useCallback((seatNumber: number) => {
     const seatId = `${tableLetter}${seatNumber}`;
     if (onSeatClick) {
       onSeatClick(seatId);
     }
-  };
+  }, [tableLetter, onSeatClick]);
 
-  const isSeatAvailable = (seatNumber: number) => {
-    const seatId = `${tableLetter}${seatNumber}`;
-    
-    // Find all bookings for this seat
-    const seatBookings = bookedSeats.filter(b => b.seatId === seatId);
-    
-    // If no bookings, seat is available
-    if (seatBookings.length === 0) {
-      return true;
-    }
-    
-    // Check for FULL_DAY bookings - if any exist, seat is not available
-    const hasFullDayBooking = seatBookings.some(booking => booking.timeSlot === 'FULL_DAY');
-    if (hasFullDayBooking) {
-      return false;
-    }
-    
-    // Check if both AM and PM are booked by different users
-    const amBooking = seatBookings.find(booking => booking.timeSlot === 'AM');
-    const pmBooking = seatBookings.find(booking => booking.timeSlot === 'PM');
-    
-    if (amBooking && pmBooking && amBooking.userId !== pmBooking.userId) {
-      // Both AM and PM booked by different users - not available
-      return false;
-    }
-    
-    // If only AM or only PM is booked, or both are booked by same user, seat is still available
-    return true;
-  };
+  const isSeatAvailable = useCallback((seatNumber: number) => {
+    return seatAvailabilityMap.get(seatNumber) ?? true;
+  }, [seatAvailabilityMap]);
 
-  const isSeatSelected = (seatNumber: number) => {
+  const isSeatSelected = useCallback((seatNumber: number) => {
     const seatId = `${tableLetter}${seatNumber}`;
     return selectedSeat === seatId;
-  };
+  }, [tableLetter, selectedSeat]);
 
-  const getTimeSlotStatus = (seatNumber: number) => {
+  const getTimeSlotStatus = useCallback((seatNumber: number) => {
+    const status = timeSlotStatusMap.get(seatNumber);
     const seatId = `${tableLetter}${seatNumber}`;
-    const seatBookings = bookedSeats.filter(b => b.seatId === seatId);
     
-    // Initialize status
-    let amBooked = false;
-    let pmBooked = false;
-    let amIsCurrentUser = false;
-    let pmIsCurrentUser = false;
+    if (!status) {
+      return {
+        am: false,
+        pm: false,
+        isCurrentUser: false,
+        amIsCurrentUser: false,
+        pmIsCurrentUser: false,
+        timeSlot: selectedSeat === seatId ? timeSlot : undefined
+      };
+    }
     
-    // Check each booking for this seat
-    seatBookings.forEach(booking => {
-      const isCurrentUserBooking = booking.userId === currentUser;
-      
-      if (booking.timeSlot === 'FULL_DAY') {
-        amBooked = true;
-        pmBooked = true;
-        amIsCurrentUser = isCurrentUserBooking;
-        pmIsCurrentUser = isCurrentUserBooking;
-      } else if (booking.timeSlot === 'AM') {
-        amBooked = true;
-        amIsCurrentUser = isCurrentUserBooking;
-      } else if (booking.timeSlot === 'PM') {
-        pmBooked = true;
-        pmIsCurrentUser = isCurrentUserBooking;
-      }
-    });
-
     return {
-      am: amBooked,
-      pm: pmBooked,
-      isCurrentUser: amIsCurrentUser || pmIsCurrentUser, // For overall seat border
-      amIsCurrentUser: amIsCurrentUser, // For AM time slot color
-      pmIsCurrentUser: pmIsCurrentUser, // For PM time slot color
+      am: status.amBooked,
+      pm: status.pmBooked,
+      isCurrentUser: status.amIsCurrentUser || status.pmIsCurrentUser, // For overall seat border
+      amIsCurrentUser: status.amIsCurrentUser, // For AM time slot color
+      pmIsCurrentUser: status.pmIsCurrentUser, // For PM time slot color
       timeSlot: selectedSeat === seatId ? timeSlot : undefined
     };
-  };
+  }, [timeSlotStatusMap, tableLetter, selectedSeat, timeSlot]);
 
   return (
     <Box sx={{ position: 'relative' }}>
@@ -176,3 +226,5 @@ export default function Table({
     </Box>
   );
 }
+
+export default React.memo(Table);

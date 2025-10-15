@@ -6,13 +6,37 @@ export interface SeatingConfig {
   seatsPerTable: number;     // Number of seats per table
   tablesPerRow: number;      // Number of tables per row in the layout
   tableLetters: string[];    // Letters for table identification
+  zones: {
+    zone1: {
+      name: string;
+      tables: string[];
+      color: string;
+    };
+    zone2: {
+      name: string;
+      tables: string[];
+      color: string;
+    };
+  };
 }
 
 export const SEATING_CONFIG: SeatingConfig = {
   numberOfTables: 10,         // Total number of tables (A, B, C, D, E, F)
   seatsPerTable: 8,          // Number of seats per table (1, 2, 3, 4, 5, 6)
   tablesPerRow: 3,           // Number of tables per row in the layout
-  tableLetters: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'] // Letters for table identification
+  tableLetters: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'], // Letters for table identification
+  zones: {
+    zone1: {
+      name: 'Zone A (Tables A-E)',
+      tables: ['A', 'B', 'C', 'D', 'E'],
+      color: '#e3f2fd' // Light blue
+    },
+    zone2: {
+      name: 'Zone B (Tables F-J)',
+      tables: ['F', 'G', 'H', 'I', 'J'],
+      color: '#f3e5f5' // Light purple
+    }
+  }
 };
 
 // Helper function to generate all possible seat IDs
