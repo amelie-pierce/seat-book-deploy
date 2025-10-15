@@ -226,41 +226,37 @@ export default function ReservationForm({
 
   // Get current seat for a date (either from dropdown, external selection, or existing booking)
   const getCurrentSeat = useCallback((dateStr: string) => {
+    console.log(`🎯 getCurrentSeat called for date: ${dateStr}`);
+    
     // First check if there's an existing booking for this date
     const booking = userBookings.find(b => b.date === dateStr);
     if (booking) {
+      console.log(`🎯 Found existing booking for ${dateStr}: ${booking.seatId}`);
       return booking.seatId;
     }
     
-    // Get the selected time slot for validation
-    const timeSlot = selectedTimeSlots[dateStr];
-    
     // Since we keep dropdown and click selections in sync, prefer dropdown as the single source of truth
     if (selectedSeatsFromDropdown[dateStr]) {
-      const dropdownSeat = selectedSeatsFromDropdown[dateStr];
-      // Validate that the dropdown seat is available for the selected time slot
-      if (!timeSlot || getAvailableSeats(dateStr, timeSlot).includes(dropdownSeat)) {
-        return dropdownSeat;
-      }
+      console.log(`🎯 Found dropdown selection for ${dateStr}: ${selectedSeatsFromDropdown[dateStr]}`);
+      return selectedSeatsFromDropdown[dateStr];
     }
     
-    // Fallback: Check if this is the selected date and we have a seat from external selection
+    // Fallback: Check if this is the selected date and we have a seat from external selection (seat button click)
     if (selectedDate === dateStr && selectedSeat) {
-      const externalSeat = selectedSeat;
-      // Validate that the external seat is available for the selected time slot
-      if (!timeSlot || getAvailableSeats(dateStr, timeSlot).includes(externalSeat)) {
-        return externalSeat;
-      }
+      console.log(`🎯 Found selectedSeat for current date ${dateStr}: ${selectedSeat}`);
+      return selectedSeat;
     }
 
     // Check if there's a seat from clicking on the seating layout for this date
     if (selectedSeatsFromClick[dateStr]) {
+      console.log(`🎯 Found click selection for ${dateStr}: ${selectedSeatsFromClick[dateStr]}`);
       return selectedSeatsFromClick[dateStr];
     }
     
-    // Return empty if no valid selection
+    // Return empty if no selection
+    console.log(`🎯 No selection found for ${dateStr}, returning empty`);
     return '';
-  }, [selectedSeatsFromDropdown, selectedSeat, selectedDate, selectedTimeSlots, userBookings, getAvailableSeats, selectedSeatsFromClick]);
+  }, [selectedSeatsFromDropdown, selectedSeat, selectedDate, userBookings, selectedSeatsFromClick]);
 
   // Reset all state when user changes (login/logout)
   const resetAllState = useCallback(() => {
@@ -741,11 +737,8 @@ export default function ReservationForm({
                     </FormControl>
                     <FormControl size="small" sx={{ minWidth: 150 }}>
                       <Select
-                        key={`seat-${dateStr}-${getCurrentSeat(dateStr)}-${selectedTimeSlots[dateStr] || 'no-slot'}`}
-                        value={(() => {
-                          const currentSeat = getCurrentSeat(dateStr);
-                          return currentSeat;
-                        })()}
+                        key={`seat-${dateStr}`}
+                        value={getCurrentSeat(dateStr)}
                         onChange={(e) => handleSeatSelectionFromDropdown(dateStr, e.target.value as string)}
                         displayEmpty
                         variant="outlined"

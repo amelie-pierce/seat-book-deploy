@@ -288,6 +288,8 @@ export default function Home() {
         const currentClickedSeat = selectedSeatsFromClick[selectedDate];
         const newSeatId = seatId === currentClickedSeat ? null : seatId;
 
+        console.log(`🔄 Seat button clicked: ${seatId}, date: ${selectedDate}, newSeatId: ${newSeatId}`);
+        
         // Update per-date seat selection
         setSelectedSeatsFromClick(prev => ({
           ...prev,
@@ -299,6 +301,8 @@ export default function Home() {
           ...selectedSeatsFromDropdown,
           [selectedDate]: newSeatId || ''
         };
+        
+        console.log(`🔄 Updating dropdown selections:`, newDropdownSelections);
         setSelectedSeatsFromDropdown(newDropdownSelections);
         
         // Notify ReservationForm about the dropdown change
@@ -306,6 +310,8 @@ export default function Home() {
 
         // Also update the main selectedSeat for current date compatibility
         setSelectedSeat(newSeatId);
+        
+        console.log(`✅ Seat selection complete. newSeatId: ${newSeatId}`);
       }
     }
   };
@@ -419,6 +425,8 @@ export default function Home() {
   };
 
   const handleDropdownSelectionChange = (selections: { [date: string]: string }) => {
+    console.log(`📋 Dropdown selections received:`, selections);
+    
     setSelectedSeatsFromDropdown(selections);
     // Sync click selections with dropdown selections to keep them in sync
     setSelectedSeatsFromClick(selections);
@@ -426,6 +434,7 @@ export default function Home() {
     // Update main selectedSeat for current date to keep seating layout in sync
     if (selectedDate) {
       const currentDateSelection = selections[selectedDate];
+      console.log(`📋 Setting selectedSeat for date ${selectedDate}: ${currentDateSelection}`);
       setSelectedSeat(currentDateSelection || null);
     }
   };
