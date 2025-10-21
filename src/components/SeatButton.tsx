@@ -14,7 +14,7 @@ interface SeatButtonProps {
     isCurrentUser: boolean;
     amIsCurrentUser?: boolean;
     pmIsCurrentUser?: boolean;
-    timeSlot?: 'AM' | 'PM' | 'FULL_DAY';
+    timeSlot?: "AM" | "PM" | "FULL_DAY";
   };
 }
 
@@ -25,7 +25,13 @@ function SeatButton({
   isAvailable = true,
   seatNumber,
   selected = false,
-  timeSlots = { am: false, pm: false, isCurrentUser: false, amIsCurrentUser: false, pmIsCurrentUser: false },
+  timeSlots = {
+    am: false,
+    pm: false,
+    isCurrentUser: false,
+    amIsCurrentUser: false,
+    pmIsCurrentUser: false,
+  },
 }: SeatButtonProps) {
   const isPartiallyBooked = timeSlots.am !== timeSlots.pm;
   const isFullyBooked = timeSlots.am && timeSlots.pm;
@@ -36,14 +42,14 @@ function SeatButton({
     isCurrentUser: boolean;
     amIsCurrentUser?: boolean;
     pmIsCurrentUser?: boolean;
-    timeSlot?: 'AM' | 'PM' | 'FULL_DAY';
+    timeSlot?: "AM" | "PM" | "FULL_DAY";
   }) => {
     // For AM slots (left half represents AM)
     if (timeSlot.am && timeSlot.amIsCurrentUser) {
-      return "#f44336"; // Red for current user's AM bookings
+      return "#FF5208"; // Red for current user's AM bookings
     }
     if (timeSlot.am) {
-      return "#e0e0e0"; // Gray for other users' AM bookings
+      return "#CDCFD0"; // Gray for other users' AM bookings
     }
     return "white"; // White for unbooked AM
   };
@@ -54,19 +60,17 @@ function SeatButton({
     isCurrentUser: boolean;
     amIsCurrentUser?: boolean;
     pmIsCurrentUser?: boolean;
-    timeSlot?: 'AM' | 'PM' | 'FULL_DAY';
+    timeSlot?: "AM" | "PM" | "FULL_DAY";
   }) => {
     // For PM slots (right half represents PM)
     if (timeSlot.pm && timeSlot.pmIsCurrentUser) {
-      return "#f44336"; // Red for current user's PM bookings
+      return "#FF5208"; // Red for current user's PM bookings
     }
     if (timeSlot.pm) {
-      return "#e0e0e0"; // Gray for other users' PM bookings
+      return "#CDCFD0"; // Gray for other users' PM bookings
     }
     return "white"; // White for unbooked PM
   };
-
-
 
   return (
     <IconButton
@@ -81,17 +85,17 @@ function SeatButton({
         padding: 0,
         overflow: "hidden",
         border: `2px solid ${
-          selected ? "#1976d2" : timeSlots.isCurrentUser ? "#f44336" : "#ccc"
+          selected ? "#f44336" : timeSlots.isCurrentUser ? "#f44336" : "#ccc"
         }`,
         cursor: !isAvailable ? "not-allowed" : "pointer",
         opacity: isAvailable ? 1 : 0.7,
-        "&:hover": !isAvailable
-          ? {}
-          : {
-              "& .seat-half": {
-                backgroundColor: selected ? "#1565c0" : "#f5f5f5",
-              },
-            },
+        // "&:hover": !isAvailable
+        //   ? {}
+        //   : {
+        //       "& .seat-half": {
+        //         backgroundColor: selected ? "#1565c0" : "#f5f5f5",
+        //       },
+        //     },
       }}
       // disabled={!isAvailable && !timeSlots.isCurrentUser}
     >
@@ -103,8 +107,8 @@ function SeatButton({
           left: 0,
           width: "50%",
           height: "100%",
-          backgroundColor: getLeftColor(timeSlots),
           transition: "background-color 0.2s",
+          backgroundColor: getLeftColor(timeSlots),
         }}
       />
       <Box
@@ -125,12 +129,12 @@ function SeatButton({
           position: "relative",
           zIndex: 1,
           color: isFullyBooked
-            ? "#fff"
+            ? "#646464"
             : isPartiallyBooked
             ? "#fff"
             : isAvailable
             ? "#4caf50"
-            : "#ccc",
+            : "#646464",
           fontSize: "0.875rem",
           fontWeight: "bold",
         }}
