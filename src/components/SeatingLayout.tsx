@@ -1,9 +1,9 @@
-import { Box, Chip, IconButton, Tooltip, Button } from '@mui/material';
-import { ZoomIn, ZoomOut, CenterFocusStrong } from '@mui/icons-material';
-import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
-import { useMemo, useRef } from 'react';
-import Table from './Table';
-import { SeatingConfig } from '../config/seatingConfig';
+import { Box, Chip, IconButton, Tooltip, Button } from "@mui/material";
+import { ZoomIn, ZoomOut, CenterFocusStrong } from "@mui/icons-material";
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
+import { useMemo, useRef } from "react";
+import Table from "./Table";
+import { SeatingConfig } from "../config/seatingConfig";
 
 interface SeatingLayoutProps {
   onSeatClick?: (seatId: string) => void;
@@ -16,13 +16,24 @@ interface SeatingLayoutProps {
   bookedSeats?: Array<{
     seatId: string;
     userId: string;
-    timeSlot: 'AM' | 'PM' | 'FULL_DAY';
+    timeSlot: "AM" | "PM" | "FULL_DAY";
   }>;
   currentUser?: string;
-  timeSlot?: 'AM' | 'PM' | 'FULL_DAY';
+  timeSlot?: "AM" | "PM" | "FULL_DAY";
 }
 
-export default function SeatingLayout({ onSeatClick, availableSeats, selectedSeat, selectedSeatsFromDropdown = {}, seatingConfig, selectedDate, onDateClick, bookedSeats = [], currentUser, timeSlot }: SeatingLayoutProps) {
+export default function SeatingLayout({
+  onSeatClick,
+  availableSeats,
+  selectedSeat,
+  selectedSeatsFromDropdown = {},
+  seatingConfig,
+  selectedDate,
+  onDateClick,
+  bookedSeats = [],
+  currentUser,
+  timeSlot,
+}: SeatingLayoutProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const transformRef = useRef<any>(null);
 
@@ -30,61 +41,63 @@ export default function SeatingLayout({ onSeatClick, availableSeats, selectedSea
   const zoneOrganization = useMemo(() => {
     const zone1Tables = seatingConfig.zones.zone1.tables;
     const zone2Tables = seatingConfig.zones.zone2.tables;
-    
+
     // Create zone 1 tables (horizontally aligned)
     const zone1Data = zone1Tables.map((tableLetter, index) => ({
       id: `zone1-table-${index}`,
       tableLetter,
-      zone: 'zone1' as const
+      zone: "zone1" as const,
     }));
-    
+
     // Create zone 2 tables (horizontally aligned)
     const zone2Data = zone2Tables.map((tableLetter, index) => ({
       id: `zone2-table-${index}`,
       tableLetter,
-      zone: 'zone2' as const
+      zone: "zone2" as const,
     }));
-    
+
     return {
       zone1: zone1Data,
-      zone2: zone2Data
+      zone2: zone2Data,
     };
   }, [seatingConfig.zones]);
 
   // Handle zone focus (zoom/center only, no highlighting)
-  const handleZoneFocus = (zone: 'zone1' | 'zone2' | 'all') => {
+  const handleZoneFocus = (zone: "zone1" | "zone2" | "all") => {
     if (!transformRef.current) return;
 
-    if (zone === 'all') {
+    if (zone === "all") {
       // Reset to show all zones
       transformRef.current.resetTransform();
       return;
     }
-    
+
     // Focus on specific zone
     setTimeout(() => {
       const zoneElement = document.getElementById(`seating-${zone}`);
       const contentElement = transformRef.current.instance.contentComponent;
       const wrapperElement = transformRef.current.instance.wrapperComponent;
-      
+
       if (zoneElement && contentElement && wrapperElement) {
         // Get the zone's position relative to the content container
         const contentRect = contentElement.getBoundingClientRect();
         const zoneRect = zoneElement.getBoundingClientRect();
         const wrapperRect = wrapperElement.getBoundingClientRect();
-        
+
         // Calculate zone center relative to content
-        const zoneRelativeX = zoneRect.left - contentRect.left + (zoneRect.width / 2);
-        const zoneRelativeY = zoneRect.top - contentRect.top + (zoneRect.height / 2);
-        
+        const zoneRelativeX =
+          zoneRect.left - contentRect.left + zoneRect.width / 2;
+        const zoneRelativeY =
+          zoneRect.top - contentRect.top + zoneRect.height / 2;
+
         // Calculate wrapper center
         const wrapperCenterX = wrapperRect.width / 2;
         const wrapperCenterY = wrapperRect.height / 2;
-        
+
         // Calculate the offset to center the zone in the wrapper
         const offsetX = wrapperCenterX - zoneRelativeX;
         const offsetY = wrapperCenterY - zoneRelativeY;
-        
+
         // Apply the transform with appropriate zoom
         const zoomLevel = 1.2;
         transformRef.current.setTransform(offsetX, offsetY, zoomLevel);
@@ -130,7 +143,7 @@ export default function SeatingLayout({ onSeatClick, availableSeats, selectedSea
     return {
       dates,
       today,
-      isAfterFridayDeadline
+      isAfterFridayDeadline,
     };
   }, []); // Only recalculate when component mounts
 
@@ -148,100 +161,128 @@ export default function SeatingLayout({ onSeatClick, availableSeats, selectedSea
   }, [selectedSeat, selectedDate, selectedSeatsFromDropdown]);
 
   return (
-    <Box sx={{
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 0,
-      alignItems: 'center',
-      height: '100%',
-      width: '100%'
-    }}>
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 0,
+        alignItems: "center",
+        height: "100%",
+        width: "100%",
+      }}
+    >
       {/* Date header chips - full width and sticky at top */}
       <Box
         sx={{
-          width: '100%',
-          display: 'flex',
+          width: "100%",
+          display: "flex",
           p: 2,
-          background: '#fff',
-          borderRadius: '8px 8px 0 0',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          position: 'sticky',
+          background: "#fff",
+          borderRadius: "8px 8px 0 0",
+          boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+          position: "sticky",
           top: 0,
           zIndex: 100,
-          borderBottom: '1px solid #e0e0e0',
-          overflowX: 'auto',
+          borderBottom: "1px solid #e0e0e0",
+          overflowX: "auto",
         }}
       >
-        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'space-between' }}>
+        <Box sx={{ display: "flex", gap: 1, justifyContent: "space-between" }}>
           {dateChips.dates.map((date) => {
-            const dateStr = date.toISOString().split('T')[0];
+            const dateStr = date.toISOString().split("T")[0];
 
             // Check if date is in the past (same logic as ReservationForm)
-            const isPastDate = !dateChips.isAfterFridayDeadline && date < dateChips.today;
+            const isPastDate =
+              !dateChips.isAfterFridayDeadline && date < dateChips.today;
 
             return (
               <Chip
                 key={dateStr}
                 label={date.toLocaleDateString()}
-                color={isPastDate ? 'default' : (selectedDate === dateStr ? 'secondary' : 'default')}
-                variant={selectedDate === dateStr ? 'filled' : 'outlined'}
+                color={
+                  isPastDate
+                    ? "default"
+                    : selectedDate === dateStr
+                    ? "secondary"
+                    : "default"
+                }
+                variant={selectedDate === dateStr ? "filled" : "outlined"}
                 sx={{
-                  fontWeight: selectedDate === dateStr ? 'bold' : 'normal',
+                  fontWeight: selectedDate === dateStr ? "bold" : "normal",
                   flex: 1,
-                  cursor: isPastDate ? 'not-allowed' : 'pointer',
-                  border: selectedDate === dateStr ? '2px solid #1976d2' : undefined,
-                  boxShadow: selectedDate === dateStr ? 2 : 0,
+                  cursor: isPastDate ? "not-allowed" : "pointer",
+                  border:
+                    selectedDate === dateStr
+                      ? "1px solid #FF5208"
+                      : "1px solid #1C262C",
                   opacity: isPastDate ? 0.5 : 1,
                   minHeight: 36,
-                  fontSize: '0.875rem',
+                  fontSize: "0.875rem",
+                  borderRadius: 2,
+                  color: selectedDate === dateStr ? "#FF5208" : "#1C262C",
+                  backgroundColor: "transparent",
+                  "&.MuiChip-root": {
+                    "&:hover": {
+                      backgroundColor: "transparent",
+                    },
+                  },
                 }}
-                onClick={onDateClick && !isPastDate ? () => onDateClick(dateStr) : undefined}
+                onClick={
+                  onDateClick && !isPastDate
+                    ? () => onDateClick(dateStr)
+                    : undefined
+                }
               />
             );
           })}
         </Box>
       </Box>
       {/* Zoomable tables section */}
-      <Box sx={{
-        flex: 1,
-        width: '100%',
-        overflow: 'hidden',
-        position: 'relative',
-        minHeight: 400,
-      }}>
+      <Box
+        sx={{
+          flex: 1,
+          width: "100%",
+          overflow: "hidden",
+          position: "relative",
+          minHeight: 400,
+        }}
+      >
         {/* Zone Focus Controls */}
         <Box
           sx={{
-            position: 'absolute',
+            position: "absolute",
             top: 20,
             left: 10,
             zIndex: 1000,
-            display: 'flex',
+            display: "flex",
             gap: 1,
-            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+            backgroundColor: "rgba(255, 255, 255, 0.9)",
             padding: 1,
             borderRadius: 1,
-            backdropFilter: 'blur(4px)'
+            backdropFilter: "blur(4px)",
           }}
         >
           <Button
             variant="outlined"
             size="small"
-            onClick={() => handleZoneFocus('zone1')}
+            onClick={() => handleZoneFocus("zone1")}
+            sx={{ border: "1px solid #000000", color: "#000000" }}
           >
             Zone A-E
           </Button>
           <Button
             variant="outlined"
             size="small"
-            onClick={() => handleZoneFocus('zone2')}
+            onClick={() => handleZoneFocus("zone2")}
+            sx={{ border: "1px solid #000000", color: "#000000" }}
           >
             Zone F-J
           </Button>
           <Button
             variant="outlined"
             size="small"
-            onClick={() => handleZoneFocus('all')}
+            onClick={() => handleZoneFocus("all")}
+            sx={{ border: "1px solid #000000", color: "#000000" }}
           >
             Show All
           </Button>
@@ -252,19 +293,19 @@ export default function SeatingLayout({ onSeatClick, availableSeats, selectedSea
           minScale={0.5}
           maxScale={3}
           wheel={{
-            step: 0.1
+            step: 0.1,
           }}
           pinch={{
-            step: 0.1
+            step: 0.1,
           }}
           limitToBounds={false}
           centerOnInit={true}
           doubleClick={{
             disabled: false,
-            mode: 'reset'
+            mode: "reset",
           }}
           panning={{
-            velocityDisabled: true
+            velocityDisabled: true,
           }}
         >
           {({ zoomIn, zoomOut, resetTransform }) => (
@@ -272,17 +313,17 @@ export default function SeatingLayout({ onSeatClick, availableSeats, selectedSea
               {/* Zoom Control Buttons */}
               <Box
                 sx={{
-                  position: 'absolute',
+                  position: "absolute",
                   top: 16,
                   right: 16,
                   zIndex: 10,
-                  display: 'flex',
-                  flexDirection: 'column',
+                  display: "flex",
+                  flexDirection: "column",
                   gap: 1,
-                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                  backgroundColor: "rgba(255, 255, 255, 0.9)",
                   borderRadius: 2,
                   padding: 1,
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                 }}
               >
                 <Tooltip title="Zoom In" placement="left">
@@ -290,9 +331,9 @@ export default function SeatingLayout({ onSeatClick, availableSeats, selectedSea
                     onClick={() => zoomIn(0.2)}
                     size="small"
                     sx={{
-                      backgroundColor: '#fff',
-                      '&:hover': {
-                        backgroundColor: '#f5f5f5',
+                      backgroundColor: "#fff",
+                      "&:hover": {
+                        backgroundColor: "#f5f5f5",
                       },
                     }}
                   >
@@ -304,9 +345,9 @@ export default function SeatingLayout({ onSeatClick, availableSeats, selectedSea
                     onClick={() => zoomOut(0.2)}
                     size="small"
                     sx={{
-                      backgroundColor: '#fff',
-                      '&:hover': {
-                        backgroundColor: '#f5f5f5',
+                      backgroundColor: "#fff",
+                      "&:hover": {
+                        backgroundColor: "#f5f5f5",
                       },
                     }}
                   >
@@ -318,9 +359,9 @@ export default function SeatingLayout({ onSeatClick, availableSeats, selectedSea
                     onClick={() => resetTransform()}
                     size="small"
                     sx={{
-                      backgroundColor: '#fff',
-                      '&:hover': {
-                        backgroundColor: '#f5f5f5',
+                      backgroundColor: "#fff",
+                      "&:hover": {
+                        backgroundColor: "#f5f5f5",
                       },
                     }}
                   >
@@ -331,59 +372,65 @@ export default function SeatingLayout({ onSeatClick, availableSeats, selectedSea
 
               <TransformComponent
                 wrapperStyle={{
-                  width: '100%',
-                  height: '100%'
+                  width: "100%",
+                  height: "100%",
                 }}
                 contentStyle={{
-                  width: '100%',
-                  height: '100%',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'flex-start',
-                  paddingTop: '200px'
+                  width: "100%",
+                  height: "100%",
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "flex-start",
+                  paddingTop: "200px",
                 }}
               >
                 {/* Two Zones Side by Side */}
-                <Box sx={{ 
-                  display: 'flex', 
-                  gap: 6, 
-                  alignItems: 'flex-start',
-                  justifyContent: 'center',
-                  width: '100%',
-                }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    gap: 6,
+                    alignItems: "flex-start",
+                    justifyContent: "center",
+                    width: "100%",
+                  }}
+                >
                   {/* Zone 1 */}
                   <Box
                     id="seating-zone1"
                     sx={{
-                      display: 'flex',
-                      flexDirection: 'column',
+                      display: "flex",
+                      flexDirection: "column",
                       gap: 2,
                       padding: 3,
                       borderRadius: 2,
-                      backgroundColor: 'rgba(227, 242, 253, 0.3)',
-                      border: '2px solid #e3f2fd',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                      backgroundColor: "rgba(227, 242, 253, 0.3)",
+                      border: "2px solid #e3f2fd",
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
                       flex: 1,
-                      maxWidth: '700px'
+                      maxWidth: "700px",
                     }}
                   >
-                    <Box sx={{ 
-                      textAlign: 'center', 
-                      mb: 1,
-                      fontSize: '1.1rem',
-                      fontWeight: 'bold',
-                      color: '#1976d2'
-                    }}>
+                    <Box
+                      sx={{
+                        textAlign: "center",
+                        mb: 1,
+                        fontSize: "1.1rem",
+                        fontWeight: "bold",
+                        color: "#1976d2",
+                      }}
+                    >
                       {seatingConfig.zones.zone1.name}
                     </Box>
-                    <Box sx={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: 'repeat(3, 1fr)',
-                      rowGap: 8,
-                      columnGap: 3,
-                      justifyItems: 'center',
-                      maxWidth: '650px'
-                    }}>
+                    <Box
+                      sx={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(3, 1fr)",
+                        rowGap: 8,
+                        columnGap: 3,
+                        justifyItems: "center",
+                        maxWidth: "650px",
+                      }}
+                    >
                       {zoneOrganization.zone1.map((table) => (
                         <Table
                           key={table.id}
@@ -393,7 +440,10 @@ export default function SeatingLayout({ onSeatClick, availableSeats, selectedSea
                           selectedSeat={(() => {
                             // Determine the effective selected seat for visual highlighting
                             // Priority: 1. Dropdown selection for current date, 2. Clicked seat
-                            if (selectedDate && selectedSeatsFromDropdown[selectedDate]) {
+                            if (
+                              selectedDate &&
+                              selectedSeatsFromDropdown[selectedDate]
+                            ) {
                               return selectedSeatsFromDropdown[selectedDate];
                             }
                             if (selectedSeat) {
@@ -415,35 +465,39 @@ export default function SeatingLayout({ onSeatClick, availableSeats, selectedSea
                   <Box
                     id="seating-zone2"
                     sx={{
-                      display: 'flex',
-                      flexDirection: 'column',
+                      display: "flex",
+                      flexDirection: "column",
                       gap: 2,
                       padding: 3,
                       borderRadius: 2,
-                      backgroundColor: 'rgba(243, 229, 245, 0.3)',
-                      border: '2px solid #f3e5f5',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                      backgroundColor: "rgba(243, 229, 245, 0.3)",
+                      border: "2px solid #f3e5f5",
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
                       flex: 1,
-                      maxWidth: '700px'
+                      maxWidth: "700px",
                     }}
                   >
-                    <Box sx={{ 
-                      textAlign: 'center', 
-                      mb: 1,
-                      fontSize: '1.1rem',
-                      fontWeight: 'bold',
-                      color: '#9c27b0'
-                    }}>
+                    <Box
+                      sx={{
+                        textAlign: "center",
+                        mb: 1,
+                        fontSize: "1.1rem",
+                        fontWeight: "bold",
+                        color: "#9c27b0",
+                      }}
+                    >
                       {seatingConfig.zones.zone2.name}
                     </Box>
-                    <Box sx={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: 'repeat(3, 1fr)',
-                      rowGap: 8,
-                      columnGap: 3,
-                      justifyItems: 'center',
-                      maxWidth: '650px'
-                    }}>
+                    <Box
+                      sx={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(3, 1fr)",
+                        rowGap: 8,
+                        columnGap: 3,
+                        justifyItems: "center",
+                        maxWidth: "650px",
+                      }}
+                    >
                       {zoneOrganization.zone2.map((table) => (
                         <Table
                           key={table.id}
