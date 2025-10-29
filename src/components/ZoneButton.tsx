@@ -19,8 +19,8 @@ export default function ZoneButton({ label, onClick }: ZoneButtonProps) {
         fontSize: "1rem",
         textTransform: "none",
         borderRadius: 1,
-        px: 2,
-        py: 1,
+        px: 1,
+        py: 0.5,
         boxShadow: 'none',
         "&:hover": {
           backgroundColor: "rgba(255, 82, 8, 0.08)",
