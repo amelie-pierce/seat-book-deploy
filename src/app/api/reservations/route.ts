@@ -1,12 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ReservationRecord } from '../../../utils/bookingStorage';
+import { ReservationRecord, parseReservationsCsvContent } from '../../../utils/bookingStorage';
 
-// In-memory storage for Vercel deployment (persists during function lifetime)
-// This will reset between cold starts but that's acceptable for demo purposes
-const inMemoryReservations: ReservationRecord[] = [];
+// In-memory storage for deployment (persists during server lifetime)
+let inMemoryReservations: ReservationRecord[] = [];
+let isInitialized = false;
+
+// Initialize in-memory storage from CSV file if available (development only)
+async function initializeFromCsv() {
+  if (isInitialized) return;
+  
+  try {
+    // Only load from CSV in development or when CSV files are accessible
+    // In production (Vercel), this will use fetch to load the CSV
+    const response = await fetch(`${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : ''}/reservations.csv`);
+    
+    if (response.ok) {
+      const csvContent = await response.text();
+      inMemoryReservations = parseReservationsCsvContent(csvContent);
+      console.log(`📊 Loaded ${inMemoryReservations.length} reservations from CSV file`);
+    } else {
+      console.log('⚠️ No reservations.csv found, starting with empty data');
+      inMemoryReservations = [];
+    }
+  } catch {
+    console.log('⚠️ Could not load CSV (normal for Vercel deployments), starting with empty data');
+    inMemoryReservations = [];
+  }
+  
+  isInitialized = true;
+}
 
 export async function GET() {
   try {
+    await initializeFromCsv();
+    
     return NextResponse.json({ 
       success: true, 
       reservations: inMemoryReservations,
@@ -23,6 +50,8 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    await initializeFromCsv();
+    
     const { reservation }: { reservation: ReservationRecord } = await request.json();
 
     // 🛡️ CONFLICT DETECTION: Check if another user already booked this seat+date+timeslot
@@ -61,6 +90,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`✅ Reservation ${reservation.reservation_id} saved successfully. Total reservations: ${inMemoryReservations.length}`);
+    
     return NextResponse.json({ 
       success: true, 
       reservation,
@@ -77,6 +107,8 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    await initializeFromCsv();
+    
     const { searchParams } = new URL(request.url);
     const reservationId = searchParams.get('id');
     
@@ -90,10 +122,9 @@ export async function DELETE(request: NextRequest) {
     console.log(`🗑️ DELETE /api/reservations - Deleting reservation: ${reservationId}`);
     
     // Remove the reservation from memory
-    const initialCount = inMemoryReservations.length;
-    const updatedReservations = inMemoryReservations.filter(r => r.reservation_id !== reservationId);
+    const indexToDelete = inMemoryReservations.findIndex(r => r.reservation_id === reservationId);
     
-    if (updatedReservations.length === initialCount) {
+    if (indexToDelete === -1) {
       console.log(`❌ Reservation ${reservationId} not found`);
       return NextResponse.json({ 
         success: false, 
@@ -101,10 +132,11 @@ export async function DELETE(request: NextRequest) {
       }, { status: 404 });
     }
     
-    // Update the in-memory array
-    inMemoryReservations.splice(0, inMemoryReservations.length, ...updatedReservations);
+    // Remove the reservation
+    inMemoryReservations.splice(indexToDelete, 1);
     
     console.log(`✅ Reservation ${reservationId} deleted successfully. Remaining: ${inMemoryReservations.length}`);
+    
     return NextResponse.json({ 
       success: true, 
       message: 'Reservation deleted successfully',

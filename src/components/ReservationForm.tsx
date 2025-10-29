@@ -79,6 +79,7 @@ export default function ReservationForm({
   const [previousUser, setPreviousUser] = useState<string | undefined>(
     currentUser
   );
+  const [manuallyClearedDates, setManuallyClearedDates] = useState<Set<string>>(new Set());
 
   // Suppress unused variable warning - pendingBookings is used through setPendingBookings
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -95,14 +96,13 @@ export default function ReservationForm({
   const updateDropdownSelection = useCallback(
     (dateStr: string, seatId: string) => {
       if (onDropdownSelectionChange) {
-        const newSelections = {
-          ...selectedSeatsFromDropdown,
+        // Only send the single date change, parent will merge
+        onDropdownSelectionChange({
           [dateStr]: seatId,
-        };
-        onDropdownSelectionChange(newSelections);
+        });
       }
     },
-    [onDropdownSelectionChange, selectedSeatsFromDropdown]
+    [onDropdownSelectionChange]
   );
 
   // Helper function to clear all dropdown selections
@@ -282,6 +282,15 @@ export default function ReservationForm({
 
   // Handle seat selection from dropdown
   const handleSeatSelectionFromDropdown = (dateStr: string, seatId: string) => {
+    // If user is selecting a seat, remove from manually cleared dates
+    if (seatId && seatId !== "") {
+      setManuallyClearedDates(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(dateStr);
+        return newSet;
+      });
+    }
+    
     const newSelections = {
       ...selectedSeatsFromDropdown,
       [dateStr]: seatId,
@@ -366,6 +375,7 @@ export default function ReservationForm({
     setSelectedZones({});
     setLastSelectedSeat(undefined);
     setPendingBookings({});
+    setManuallyClearedDates(new Set());
     clearAllDropdownSelections();
     setShowSuccess(false);
   }, [clearAllDropdownSelections]);
@@ -699,6 +709,27 @@ export default function ReservationForm({
     }
   };
 
+  const handleClearDate = (date: string) => {
+    console.log(`🧹 Clear button clicked for date: ${date}`);
+    console.log(`🧹 Current seat for ${date}:`, getCurrentSeat(date));
+    console.log(`🧹 selectedSeatsFromDropdown[${date}]:`, selectedSeatsFromDropdown[date]);
+    
+    // Mark this date as manually cleared to prevent auto-fill
+    setManuallyClearedDates(prev => new Set(prev).add(date));
+    
+    // Clear seat selection for this date (table and desk will show placeholders)
+    updateDropdownSelection(date, "");
+    
+    // Clear click selection in parent
+    if (onClearClickSelection) {
+      onClearClickSelection(date);
+    }
+    
+    console.log(`🧹 Clear completed for date: ${date}`);
+    
+    // Note: We don't reset time slot or zone - only clear the seat selection
+  };
+
   const getTimeSlotForDate = (dateStr: string) => {
     // First check if there's an existing booking
     const existingBooking = userBookings.find((b) => b.date === dateStr);
@@ -788,6 +819,7 @@ export default function ReservationForm({
         // Clear dropdown selections after submission
         clearAllDropdownSelections();
         setPendingBookings({});
+        setManuallyClearedDates(new Set()); // Clear manually cleared dates after booking
 
         // Notify parent about clearing dropdown selections
         if (onDropdownSelectionChange) {
@@ -1375,8 +1407,31 @@ export default function ReservationForm({
                   </Box>
                 </Box>
 
-                {/* Remove Button */}
-                <Box sx={{ display: "flex", alignItems: "center" }}>
+                {/* Clear and Remove Buttons */}
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1, alignItems: "center" }}>
+                  {/* Clear Button */}
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    sx={{
+                      color: "#6B7280",
+                      borderColor: "#E5E7EB",
+                      textTransform: "none",
+                      fontWeight: 600,
+                      minWidth: 80,
+                      height: "fit-content",
+                      "&:hover": {
+                        borderColor: "#9CA3AF",
+                        backgroundColor: "#F9FAFB",
+                      },
+                    }}
+                    onClick={() => handleClearDate(dateStr)}
+                    disabled={isPastDate || (!selectedSeatsFromDropdown[dateStr] && !selectedSeatsFromClick[dateStr] && !(selectedDate === dateStr && selectedSeat))}
+                  >
+                    Clear
+                  </Button>
+
+                  {/* Remove Button */}
                   <Button
                     variant="outlined"
                     size="small"
