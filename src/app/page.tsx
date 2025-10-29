@@ -36,7 +36,15 @@ const userAvatar = {
 }
 
 export default function Home() {
-  const todayDate = new Date().toISOString().split("T")[0];
+  // Helper function to convert local date to YYYY-MM-DD string without timezone issues
+  const formatLocalDate = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const todayDate = formatLocalDate(new Date());
 
   // Function to get the first available (non-disabled) date
   const getFirstAvailableDate = () => {
@@ -77,7 +85,7 @@ export default function Home() {
     for (const date of dates) {
       const isPastDate = !isAfterFridayDeadline && date < today;
       if (!isPastDate) {
-        return date.toISOString().split("T")[0];
+        return formatLocalDate(date);
       }
     }
 

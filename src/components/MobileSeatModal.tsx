@@ -15,7 +15,7 @@ import {
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { TransitionProps } from '@mui/material/transitions';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 
 const userAvatar = {
   1234: 'https://i.pravatar.cc/150?img=1',
@@ -106,7 +106,10 @@ export default function MobileSeatModal({
 
   const formatDate = (dateStr: string) => {
     if(!dateStr) return '';
-    return format(parseISO(dateStr), 'EEEE, MMMM d, yyyy');
+    // Parse the date string as local date to avoid timezone offset issues
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const localDate = new Date(year, month - 1, day);
+    return format(localDate, 'EEEE, MMMM d, yyyy');
   };
 
   const getTimeSlotLabel = (timeSlot: TimeSlotType) => {

@@ -77,6 +77,14 @@ export default function SeatingLayout({
     }
   };
 
+  // Helper function to convert local date to YYYY-MM-DD string without timezone issues
+  const formatLocalDate = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Memoize date chips generation to avoid recalculating on every render
   const dateChips = useMemo(() => {
     const now = new Date();
@@ -168,8 +176,10 @@ export default function SeatingLayout({
       >
         <Box sx={{ display: "flex", gap: 1, flex: 1, alignItems: "flex-start" }}>
           {dateChips.dates.map((date) => {
-            const dateStr = date.toISOString().split("T")[0];
+            const dateStr = formatLocalDate(date);
             const isCurrentDate = dateStr === selectedDate;
+            // console.log('date', date, 'datestring', dateStr);
+
             // Check if date is in the past (same logic as ReservationForm)
             const isPastDate =
               !dateChips.isAfterFridayDeadline && date < dateChips.today;
