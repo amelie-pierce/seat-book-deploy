@@ -1204,10 +1204,10 @@ export default function ReservationForm({
                 </Box>
 
                 {/* Remove Button */}
-                <Box sx={{ display: "flex", alignItems: "center" }}>
+                <Box sx={{  }}>
+                  <p>&nbsp;</p>
                   <Button
                     variant="outlined"
-                    size="small"
                     sx={{
                       color: "#FF5208",
                       borderColor: "#FF5208",
