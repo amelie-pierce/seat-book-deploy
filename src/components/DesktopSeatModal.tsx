@@ -1,20 +1,16 @@
-import { useState, useEffect, forwardRef, ReactElement } from "react";
+import { useState, useEffect } from "react";
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
+  Popover,
   Button,
   Typography,
   Box,
   Alert,
   Chip,
-  Slide,
   Avatar,
+  Paper,
 } from "@mui/material";
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { TransitionProps } from '@mui/material/transitions';
 import { format, parseISO } from 'date-fns';
 
 const userAvatar = {
@@ -25,18 +21,9 @@ const userAvatar = {
   "U004": 'https://i.pravatar.cc/150?img=5',
 } as { [key: string]: string };
 
-const SlideTransition = forwardRef<
-  unknown,
-  TransitionProps & {
-    children: ReactElement;
-  }
->(function Transition(props, ref) {
-  return <Slide direction="up" ref={ref} {...props} />;
-});
-
 type TimeSlotType = 'AM' | 'PM' | 'FULL_DAY';
 
-interface MobileSeatModalProps {
+interface DesktopSeatModalProps {
   open: boolean;
   onClose: () => void;
   seatId: string;
@@ -50,9 +37,10 @@ interface MobileSeatModalProps {
     timeSlot: 'AM' | 'PM' | 'FULL_DAY';
   } | undefined;
   availableTimeSlots: TimeSlotType[];
+  anchorPosition?: { top: number; left: number } | null;
 }
 
-export default function MobileSeatModal({
+export default function DesktopSeatModal({
   open,
   onClose,
   seatId,
@@ -62,7 +50,8 @@ export default function MobileSeatModal({
   currentUser,
   currentUserBooking,
   availableTimeSlots,
-}: MobileSeatModalProps) {
+  anchorPosition
+}: DesktopSeatModalProps) {
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<TimeSlotType | ''>('');
 
   const isCurrentUserBooked = !!currentUserBooking;
@@ -129,67 +118,56 @@ export default function MobileSeatModal({
   };
 
   return (
-    <Dialog
+    <Popover
       open={open}
       onClose={handleClose}
-      fullWidth
-      maxWidth="xs"
-      TransitionComponent={SlideTransition}
-      PaperProps={{
-        sx: {
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          m: 0,
-          width: '100%',
-          maxWidth: 'none',
-          borderRadius: '16px 16px 0 0',
-          maxHeight: '85vh',
-          boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.1)',
+      anchorReference="anchorPosition"
+      anchorPosition={
+        anchorPosition
+          ? { top: anchorPosition.top, left: anchorPosition.left }
+          : undefined
+      }
+      transformOrigin={{
+        vertical: 'top',
+        horizontal: 'center',
+      }}
+      slotProps={{
+        paper: {
+          sx: {
+            borderRadius: 3,
+            maxHeight: '90vh',
+            minWidth: 300,
+            maxWidth: 400,
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
+            overflow: 'visible',
+          }
         }
       }}
       sx={{
-        '& .MuiDialog-container': {
-          alignItems: 'flex-end',
-        },
         '& .MuiBackdrop-root': {
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          backgroundColor: 'rgba(0, 0, 0, 0.3)',
         }
       }}
     >
-      <DialogTitle sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-      }}>
-        {/* Drag Handle */}
-        <Box
-          sx={{
-            width: 40,
-            height: 4,
-            backgroundColor: 'grey.300',
-            borderRadius: 2,
-            mb: 2,
-            cursor: 'pointer'
-          }}
-          onClick={handleClose}
-        />
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="h6" component="span">
-              {getSeatDisplayName(seatId)}
-            </Typography>
+      <Paper elevation={0} sx={{ p: 3 }}>
+        {/* Header */}
+        <Box sx={{ mb: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="h6" component="span">
+                {getSeatDisplayName(seatId)}
+              </Typography>
+            </Box>
+            {!isCurrentUserBooked && <Chip
+              label={"Free"}
+              color={"success"}
+              sx={{ borderRadius: 2 }}
+            />}
           </Box>
-          {!isCurrentUserBooked && <Chip
-            label={"Free"}
-            color={"success"}
-            sx={{ borderRadius: 2 }}
-          />}
         </Box>
-      </DialogTitle>
 
-      <DialogContent sx={{ pb: 0, px: 3 }}>
+        {/* Content */}
+        <Box>
         {isCurrentUserBooked ? (
           // Show booking details when user has already booked
           <>
@@ -275,55 +253,49 @@ export default function MobileSeatModal({
             )}
           </>
         )}
-      </DialogContent>
+        </Box>
 
-      <DialogActions sx={{
-        px: 3,
-        pb: 3,
-        flexDirection: 'column',
-        gap: 2,
-        '& > :not(style) ~ :not(style)': {
-          ml: 0,
-        }
-      }}>
-        {isCurrentUserBooked ? (
-          <Button
-            onClick={handleRemove}
-            variant="outlined"
-            fullWidth
-            size="large"
-            startIcon={<DeleteIcon />}
-            sx={{
-              fontSize: '1rem',
-              fontWeight: 600,
-              color: 'error.main',
-              borderColor: 'error.main',
-              '&:hover': {
-                backgroundColor: 'error.main',
-                color: 'white',
+        {/* Actions */}
+        <Box sx={{ mt: 3 }}>
+          {isCurrentUserBooked ? (
+            <Button
+              onClick={handleRemove}
+              variant="outlined"
+              fullWidth
+              size="large"
+              startIcon={<DeleteIcon />}
+              sx={{
+                fontSize: '1rem',
+                fontWeight: 600,
+                color: 'error.main',
                 borderColor: 'error.main',
-              }
-            }}
-          >
-            Remove
-          </Button>
-        ) : (
-          <Button
-            onClick={handleSubmit}
-            variant="contained"
-            disabled={!selectedTimeSlot || availableTimeSlots.length === 0}
-            fullWidth
-            size="large"
-            sx={{
-              py: 1.5,
-              fontSize: '1rem',
-              fontWeight: 600
-            }}
-          >
-            Book Desk
-          </Button>
-        )}
-      </DialogActions>
-    </Dialog>
+                '&:hover': {
+                  backgroundColor: 'error.main',
+                  color: 'white',
+                  borderColor: 'error.main',
+                }
+              }}
+            >
+              Remove
+            </Button>
+          ) : (
+            <Button
+              onClick={handleSubmit}
+              variant="contained"
+              disabled={!selectedTimeSlot || availableTimeSlots.length === 0}
+              fullWidth
+              size="large"
+              sx={{
+                py: 1.5,
+                fontSize: '1rem',
+                fontWeight: 600
+              }}
+            >
+              Book Desk
+            </Button>
+          )}
+        </Box>
+      </Paper>
+    </Popover>
   );
 }

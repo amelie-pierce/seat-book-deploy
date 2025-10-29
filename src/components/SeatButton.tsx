@@ -1,13 +1,24 @@
-import React from "react";
-import { Box, IconButton, Typography } from "@mui/material";
+import React, { useState } from "react";
+import { Box, IconButton, Typography, Avatar } from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
+
+const userAvatar = {
+  1234: 'https://i.pravatar.cc/150?img=1',
+  "U001": 'https://i.pravatar.cc/150?img=2',
+  "U002": 'https://i.pravatar.cc/150?img=3',
+  "U003": 'https://i.pravatar.cc/150?img=4',
+  "U004": 'https://i.pravatar.cc/150?img=5',
+} as { [key: string]: string };
 
 interface SeatButtonProps {
-  position: "top" | "bottom";
+  position: "top" | "bottom" | "left" | "right";
   leftPosition: string;
-  onClick?: () => void;
+  onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void;
   isAvailable?: boolean;
   seatNumber?: number;
+  seatId?: string;
   selected?: boolean;
+  bookedByUser?: string; // User ID who booked the seat
   timeSlots?: {
     am: boolean;
     pm: boolean;
@@ -24,7 +35,9 @@ function SeatButton({
   onClick,
   isAvailable = true,
   seatNumber,
+  seatId,
   selected = false,
+  bookedByUser,
   timeSlots = {
     am: false,
     pm: false,
@@ -33,8 +46,13 @@ function SeatButton({
     pmIsCurrentUser: false,
   },
 }: SeatButtonProps) {
+  const [isHovered, setIsHovered] = useState(false);
+  
   const isPartiallyBooked = timeSlots.am !== timeSlots.pm;
   const isFullyBooked = timeSlots.am && timeSlots.pm;
+  
+  // Check if the seat is booked (either AM, PM, or FULL_DAY)
+  const isBooked = timeSlots.am || timeSlots.pm;
 
   const getLeftColor = (timeSlot: {
     am: boolean;
@@ -74,32 +92,37 @@ function SeatButton({
 
   return (
     <IconButton
+      data-seat-id={seatId}
       onClick={onClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       sx={{
         position: "absolute",
-        [position]: -25,
-        left: leftPosition,
-        transform: "translateX(-50%)",
-        width: 36,
-        height: 36,
+        ...(position === "top" || position === "bottom" 
+          ? {
+              [position]: -25,
+              left: leftPosition,
+              transform: "translateX(-50%)",
+            }
+          : {
+              [position]: -25,
+              top: leftPosition,
+              transform: "translateY(-50%)",
+            }
+        ),
+        width: 50,
+        height: 50,
         padding: 0,
         overflow: "hidden",
-        border: `2px solid ${
-          selected ? "#f44336" : timeSlots.isCurrentUser ? "#f44336" : "#ccc"
-        }`,
-        cursor: !isAvailable ? "not-allowed" : "pointer",
-        opacity: isAvailable ? 1 : 0.7,
-        // "&:hover": !isAvailable
-        //   ? {}
-        //   : {
-        //       "& .seat-half": {
-        //         backgroundColor: selected ? "#1565c0" : "#f5f5f5",
-        //       },
-        //     },
+        // border: `2px solid #CDCFD0`,
+        backgroundColor: isBooked ? 'primary.main' : '#61BF76',
+        "&:hover": {
+          backgroundColor: '#FF5208',
+        },
       }}
-      // disabled={!isAvailable && !timeSlots.isCurrentUser}
+    // disabled={!isAvailable && !timeSlots.isCurrentUser}
     >
-      <Box
+      {/* <Box
         className="seat-half left"
         sx={{
           position: "absolute",
@@ -122,25 +145,46 @@ function SeatButton({
           backgroundColor: getRightColor(timeSlots),
           transition: "background-color 0.2s",
         }}
-      />
-      <Typography
-        variant="body2"
-        sx={{
-          position: "relative",
-          zIndex: 1,
-          color: isFullyBooked
-            ? "#646464"
-            : isPartiallyBooked
-            ? "#fff"
-            : isAvailable
-            ? "#4caf50"
-            : "#646464",
-          fontSize: "0.875rem",
-          fontWeight: "bold",
-        }}
-      >
-        {seatNumber}
-      </Typography>
+      /> */}
+      {isBooked && bookedByUser ? (
+        // Show user avatar when seat is booked
+        <Avatar
+          src={userAvatar[bookedByUser]}
+          sx={{
+            width: 41,
+            height: 41,
+            fontSize: '0.75rem',
+            position: "relative",
+            zIndex: 1,
+          }}
+        >
+          {bookedByUser.charAt(0)}
+        </Avatar>
+      ) : isHovered ? (
+        // Show plus icon on hover when seat is not booked
+        <AddIcon
+          sx={{
+            position: "relative",
+            zIndex: 1,
+            color: "#fff",
+            fontSize: "1.25rem",
+          }}
+        />
+      ) : (
+        // Show seat number when not booked and not hovered
+        <Typography
+          variant="body2"
+          sx={{
+            position: "relative",
+            zIndex: 1,
+            color: "#fff",
+            fontSize: "1.5rem",
+            fontWeight: "bold",
+          }}
+        >
+          {seatNumber}
+        </Typography>
+      )}
     </IconButton>
   );
 }

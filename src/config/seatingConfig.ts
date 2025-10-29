@@ -21,19 +21,19 @@ export interface SeatingConfig {
 }
 
 export const SEATING_CONFIG: SeatingConfig = {
-  numberOfTables: 10,         // Total number of tables (A, B, C, D, E, F)
-  seatsPerTable: 8,          // Number of seats per table (1, 2, 3, 4, 5, 6)
-  tablesPerRow: 3,           // Number of tables per row in the layout
-  tableLetters: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'], // Letters for table identification
+  numberOfTables: 21,         // Total number of tables (9 in Zone A + 12 in Zone B)
+  seatsPerTable: 8,          // Default number of seats per table (4 on top, 4 on bottom)
+  tablesPerRow: 3,           // Number of tables per row in the layout (for Zone A)
+  tableLetters: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U'], // Letters for table identification
   zones: {
     zone1: {
-      name: 'Zone A (Tables A-E)',
-      tables: ['A', 'B', 'C', 'D', 'E'],
+      name: 'Zone A (Tables A-I)',
+      tables: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'],
       color: '#e3f2fd' // Light blue
     },
     zone2: {
-      name: 'Zone B (Tables F-J)',
-      tables: ['F', 'G', 'H', 'I', 'J'],
+      name: 'Zone B (Tables J-U)',
+      tables: ['J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U'],
       color: '#f3e5f5' // Light purple
     }
   }
@@ -44,7 +44,23 @@ export const generateAllSeats = (config: SeatingConfig): string[] => {
   const allSeats: string[] = [];
   for (let tableIndex = 0; tableIndex < config.numberOfTables; tableIndex++) {
     const tableLetter = config.tableLetters[tableIndex];
-    for (let seatNumber = 1; seatNumber <= config.seatsPerTable; seatNumber++) {
+    
+    // Determine seats per table based on zone and position
+    let seatsForTable = 8; // Default
+    
+    // Zone A (A-I): Tables B, E, H (2nd column in 3x3 grid) have 6 seats
+    if (['B', 'E', 'H'].includes(tableLetter)) {
+      seatsForTable = 6;
+    }
+    // Zone B (J-U): First row (J-O) have 6 seats, second row (P-U) have 4 seats
+    else if (['J', 'K', 'L', 'M', 'N', 'O'].includes(tableLetter)) {
+      seatsForTable = 6;
+    }
+    else if (['P', 'Q', 'R', 'S', 'T', 'U'].includes(tableLetter)) {
+      seatsForTable = 4;
+    }
+    
+    for (let seatNumber = 1; seatNumber <= seatsForTable; seatNumber++) {
       allSeats.push(`${tableLetter}${seatNumber}`);
     }
   }

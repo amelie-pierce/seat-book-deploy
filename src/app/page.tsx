@@ -4,30 +4,36 @@ import {
   Container,
   Box,
   Typography,
-  Chip,
-  Button,
   CircularProgress,
   Alert,
   Snackbar,
   Tabs,
   Tab,
-  useMediaQuery,
-  useTheme,
+  IconButton,
+  Avatar,
 } from "@mui/material";
 import {
-  Person as PersonIcon,
   ExitToApp as LogoutIcon,
   Event as EventIcon,
   Chair as ChairIcon,
 } from "@mui/icons-material";
 import SeatingLayout from "../components/SeatingLayout";
 import ReservationForm from "../components/ReservationForm";
-import MobileSeatModal from "../components/MobileSeatModal";
+import SeatModal from "../components/SeatModal";
 import { useUserSession } from "../hooks/useUserSession";
 import { SEATING_CONFIG, generateAllSeats } from "../config/seatingConfig";
 import { bookingService } from "../services/bookingService";
+import { vercelDataService } from "../services/vercelDataService";
 import { BookingRecord } from "../utils/bookingStorage";
 import { useEffect } from "react";
+
+const userAvatar = {
+  1234: 'https://i.pravatar.cc/150?img=1',
+  "U001": 'https://i.pravatar.cc/150?img=2',
+  "U002": 'https://i.pravatar.cc/150?img=3',
+  "U003": 'https://i.pravatar.cc/150?img=4',
+  "U004": 'https://i.pravatar.cc/150?img=5',
+}
 
 export default function Home() {
   const todayDate = new Date().toISOString().split("T")[0];
@@ -88,6 +94,7 @@ export default function Home() {
   }>({});
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [userBookings, setUserBookings] = useState<BookingRecord[]>([]);
+  const [userEmail, setUserEmail] = useState<string>("");
   const [bookingsMap, setBookingsMap] = useState<{
     [date: string]: { seatId: string; timeSlot: "AM" | "PM" | "FULL_DAY" };
   }>({});
@@ -106,16 +113,15 @@ export default function Home() {
     }>
   >([]);
 
-  // Mobile tab state
-  const [mobileTabValue, setMobileTabValue] = useState(0);
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  // Desktop tab state
+  const [desktopTabValue, setDesktopTabValue] = useState(0);
 
   // Mobile seat modal state
   const [mobileSeatModalOpen, setMobileSeatModalOpen] = useState(false);
   const [mobileSeatModalSeatId, setMobileSeatModalSeatId] =
     useState<string>("");
   const [mobileSeatModalDate, setMobileSeatModalDate] = useState<string>("");
+  const [modalAnchorPosition, setModalAnchorPosition] = useState<{ top: number; left: number } | null>(null);
 
   // Memoize filtered userBookings to prevent infinite loops in ReservationForm
   const activeUserBookings = useMemo(() => {
@@ -191,6 +197,17 @@ export default function Home() {
             await bookingService.refreshFromCsv();
           }
 
+          // Fetch user email
+          try {
+            const userInfo = await vercelDataService.getUserById(currentUser);
+            if (userInfo && userInfo.email) {
+              setUserEmail(userInfo.email);
+            }
+          } catch (error) {
+            console.error("Error fetching user email:", error);
+            setUserEmail(""); // Fallback to empty string
+          }
+
           const userData = await bookingService.loadUserData(currentUser);
           setUserBookings(userData.userBookings);
 
@@ -213,6 +230,7 @@ export default function Home() {
         // Clear user-specific data when user logs out
         setUserBookings([]);
         setSelectedSeat(null);
+        setUserEmail(""); // Clear email when user logs out
       }
     };
 
@@ -253,7 +271,7 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser]);
 
-  const handleSeatClick = (seatId: string) => {
+  const handleSeatClick = (seatId: string, event?: React.MouseEvent<HTMLButtonElement>) => {
     // Check seat availability using the new logic
     const isSeatClickable = () => {
       // Find all bookings for this seat on the selected date
@@ -266,15 +284,25 @@ export default function Home() {
         return true;
       }
 
-      // Check for FULL_DAY bookings - if any exist, seat is not available
+      // Check if current user has booked this seat
+      const currentUserBooking = seatBookings.find(
+        (booking) => booking.userId === currentUser
+      );
+
+      // If current user has booked this seat, allow clicking to manage it
+      if (currentUserBooking) {
+        return true;
+      }
+
+      // Check for FULL_DAY bookings by other users
       const hasFullDayBooking = seatBookings.some(
-        (booking) => booking.timeSlot === "FULL_DAY"
+        (booking) => booking.timeSlot === "FULL_DAY" && booking.userId !== currentUser
       );
       if (hasFullDayBooking) {
         return false;
       }
 
-      // Check if both AM and PM are booked by different users
+      // Check if both AM and PM are booked by different users (not current user)
       const amBooking = seatBookings.find(
         (booking) => booking.timeSlot === "AM"
       );
@@ -282,8 +310,11 @@ export default function Home() {
         (booking) => booking.timeSlot === "PM"
       );
 
-      if (amBooking && pmBooking && amBooking.userId !== pmBooking.userId) {
-        // Both AM and PM booked by different users - not available
+      if (amBooking && pmBooking &&
+        amBooking.userId !== currentUser &&
+        pmBooking.userId !== currentUser &&
+        amBooking.userId !== pmBooking.userId) {
+        // Both AM and PM booked by different users (not current user) - not available
         return false;
       }
 
@@ -292,8 +323,20 @@ export default function Home() {
     };
 
     if (isSeatClickable()) {
-      // On mobile, open the seat selection modal (only if authenticated)
-      if (isMobile && selectedDate) {
+      // Open the seat selection modal for both mobile and desktop
+      if (selectedDate) {
+        console.log("selectedDate", selectedDate)
+        // Calculate position for desktop modal
+        if (event) {
+          const buttonRect = event.currentTarget.getBoundingClientRect();
+          setModalAnchorPosition({
+            top: buttonRect.top,
+            left: buttonRect.left + buttonRect.width / 2,
+          });
+        } else {
+          setModalAnchorPosition(null);
+        }
+
         setMobileSeatModalSeatId(seatId);
         setMobileSeatModalDate(selectedDate);
         setMobileSeatModalOpen(true);
@@ -363,6 +406,43 @@ export default function Home() {
     }
   };
 
+  const handleMobileSeatModalRemove = async (
+    seatId: string,
+    timeSlot: "AM" | "PM" | "FULL_DAY"
+  ) => {
+    if (!mobileSeatModalDate || !currentUser) return;
+
+    try {
+      // Find the booking to remove
+      const bookingToRemove = userBookings.find(
+        (booking) =>
+          booking.seatId === seatId &&
+          booking.date === mobileSeatModalDate &&
+          booking.timeSlot === timeSlot &&
+          booking.status === "ACTIVE"
+      );
+
+      if (bookingToRemove) {
+        // Use the booking service to cancel the booking
+        await bookingService.cancelBooking(bookingToRemove.id, currentUser);
+
+        // Refresh user bookings
+        const userData = await bookingService.loadUserData(currentUser);
+        setUserBookings(userData.userBookings);
+
+        // Refresh the current date view
+        if (selectedDate) {
+          await handleDateClick(selectedDate);
+        }
+      }
+
+      handleMobileSeatModalClose();
+    } catch (error) {
+      console.error("Failed to remove reservation:", error);
+      setBookingError("Failed to remove reservation. Please try again.");
+    }
+  };
+
   const handleLogout = async () => {
     // Clear all state before logout
     setSelectedSeat(null);
@@ -385,11 +465,11 @@ export default function Home() {
     }
   };
 
-  const handleMobileTabChange = (
+  const handleDesktopTabChange = (
     event: React.SyntheticEvent,
     newValue: number
   ) => {
-    setMobileTabValue(newValue);
+    setDesktopTabValue(newValue);
   };
 
   const handleReservation = async (
@@ -556,7 +636,8 @@ export default function Home() {
 
   return (
     <Container
-      maxWidth="xl"
+      maxWidth={false}
+      disableGutters
       sx={{ height: "100vh", py: 2, display: "flex", flexDirection: "column" }}
     >
       {/* User Session Header */}
@@ -566,107 +647,133 @@ export default function Home() {
           justifyContent: "space-between",
           alignItems: "center",
           mb: 2,
-          pb: 2,
-          borderBottom: "1px solid #CDCFD0",
+          px: 2,
         }}
       >
-        <Typography variant="h5" component="h3" color="#000000">
-          Flexi Seat
-        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Typography variant="h5" component="h3" color="#000000">
+            Flexi Seat
+          </Typography>
+        </Box>
 
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Chip
-            icon={<PersonIcon />}
-            label={`${currentUser}`}
-            color="primary"
-            variant="outlined"
-            sx={{ border: "1px solid #000000", color: "#000000" }}
-          />
-          <Button
-            startIcon={<LogoutIcon />}
-            onClick={handleLogout}
-            variant="outlined"
-            size="small"
-            sx={{ border: "1px solid #000000", color: "#000000" }}
+          <Box
+            sx={{ display: "flex", alignItems: "center", gap: 1, fontWeight: 500 }}
           >
-            Logout
-          </Button>
+            <Avatar
+              src={userAvatar[currentUser as keyof typeof userAvatar]}
+              sx={{
+                width: 35,
+                height: 35,
+              }}
+            >
+              {currentUser?.charAt(0)}
+            </Avatar>
+            <Box sx={{ fontSize: '0.9rem' }}>
+              <p>{currentUser}</p>
+              <Typography sx={{ fontStyle: 'italic', fontSize: '0.75rem' }}>
+                {userEmail || 'No email available'}
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton
+            onClick={handleLogout}
+          >
+            <LogoutIcon />
+          </IconButton>
         </Box>
       </Box>
 
-      {/* Mobile Tabs - Only show on mobile */}
-      {isMobile && (
+
+
+      <Box
+        sx={{
+          display: "flex",
+          flex: 1,
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
         <Tabs
-          value={mobileTabValue}
-          onChange={handleMobileTabChange}
-          aria-label="mobile navigation tabs"
+          value={desktopTabValue}
+          onChange={handleDesktopTabChange}
+          aria-label="desktop navigation tabs"
+          sx={{
+            position: "absolute",
+            top: 0,
+            left: '50%',
+            zIndex: 1000,
+            width: { xs: '100%', md: 'auto' },
+            transform: 'translateX(-50%)',
+            "& .MuiTabs-indicator": {
+              display: "none",
+            },
+          }}
           variant="fullWidth"
         >
           <Tab
-            icon={<ChairIcon />}
-            label="Seating"
-            id="mobile-tab-0"
-            aria-controls="mobile-tabpanel-0"
+            icon={<ChairIcon sx={{ fontSize: 20 }} />}
+            iconPosition="start"
+            label="List View"
+            id="desktop-tab-0"
+            aria-controls="desktop-tabpanel-0"
             sx={{
-              "&.Mui-selected": { color: "#FF5208" },
-              ".MuiTabs-indicator": { backgroundColor: "#FF5208" },
+              minHeight: 40,
+              textTransform: "none",
+              fontSize: "1rem",
+              color: "#6B7280",
+              backgroundColor: desktopTabValue === 0 ? "#FF5208" : "#D1D5DB",
+              borderRadius: "8px 0 0 8px",
+              px: 3,
+              py: 1,
+              whiteSpace: 'nowrap',
+              "&.Mui-selected": {
+                color: '#FFFFFF',
+              },
+              "& .MuiTab-iconWrapper": {
+                marginRight: 1,
+              },
             }}
           />
           <Tab
-            icon={<EventIcon />}
-            label="Reservation"
-            id="mobile-tab-1"
-            aria-controls="mobile-tabpanel-1"
+            icon={<EventIcon sx={{ fontSize: 20 }} />}
+            iconPosition="start"
+            label="Map View"
+            id="desktop-tab-1"
+            aria-controls="desktop-tabpanel-1"
             sx={{
-              "&.Mui-selected": { color: "#FF5208" },
-              ".MuiTabs-indicator": { backgroundColor: "#FF5208" },
+              minHeight: 40,
+              textTransform: "none",
+              fontSize: "1rem",
+              color: "#6B7280",
+              backgroundColor: desktopTabValue === 1 ? "#FF5208" : "#D1D5DB",
+              borderRadius: "0 8px 8px 0",
+              px: 3,
+              py: 1,
+              whiteSpace: 'nowrap',
+              "&.Mui-selected": {
+                color: '#FFFFFF',
+              },
+              "& .MuiTab-iconWrapper": {
+                marginRight: 1,
+              },
             }}
           />
         </Tabs>
-      )}
-
-      {/* Desktop Layout - Side by side */}
-      {!isMobile ? (
         <Box
+          role="tabpanel"
+          hidden={desktopTabValue !== 0}
+          id="desktop-tabpanel-0"
+          aria-labelledby="desktop-tab-0"
           sx={{
-            display: "flex",
-            gap: 2,
             flex: 1,
+            overflow: "auto",
+            p: 3,
+            display: desktopTabValue === 0 ? "flex" : "none",
+            flexDirection: "column",
           }}
         >
-          {/* Left Section - Seating Layout */}
-          <Box
-            sx={{
-              flex: "0 0 60%",
-              backgroundColor: "#f8f9fa",
-              borderRight: "1px solid #CDCFD0",
-              overflow: "hidden",
-            }}
-          >
-            <SeatingLayout
-              onSeatClick={handleSeatClick}
-              availableSeats={availableSeatsForDate}
-              selectedSeat={selectedSeat || undefined}
-              selectedSeatsFromDropdown={selectedSeatsFromDropdown}
-              seatingConfig={SEATING_CONFIG}
-              selectedDate={selectedDate || undefined}
-              onDateClick={handleDateClick}
-              bookedSeats={allBookingsForDate}
-              currentUser={currentUser || undefined}
-              timeSlot={bookingsMap[selectedDate || ""]?.timeSlot}
-            />
-          </Box>
-
-          {/* Right Section - Reservation Form */}
-          <Box
-            sx={{
-              flex: "0 0 40%",
-              p: 3,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
+          {desktopTabValue === 0 && (
             <ReservationForm
               selectedDate={selectedDate || undefined}
               onDateClick={handleDateClick}
@@ -715,25 +822,22 @@ export default function Home() {
                 }
               }}
             />
-          </Box>
+          )}
         </Box>
-      ) : (
-        // Mobile Layout - Tabbed
-        <Box sx={{ flex: 1 }}>
-          {/* Tab Panel 0 - Seating Layout */}
-          <Box
-            role="tabpanel"
-            hidden={mobileTabValue !== 0}
-            id="mobile-tabpanel-0"
-            aria-labelledby="mobile-tab-0"
-            sx={{
-              backgroundColor: "#f8f9fa",
-              borderRadius: 2,
-              display: mobileTabValue === 0 ? "flex" : "none",
-              border: "1px solid #e0e0e0",
-              height: "100%",
-            }}
-          >
+
+        <Box
+          role="tabpanel"
+          hidden={desktopTabValue !== 1}
+          id="desktop-tabpanel-1"
+          aria-labelledby="desktop-tab-1"
+          sx={{
+            flex: 1,
+            backgroundColor: "#f8f9fa",
+            overflow: "hidden",
+            display: desktopTabValue === 1 ? "block" : "none",
+          }}
+        >
+          {desktopTabValue === 1 && (
             <SeatingLayout
               onSeatClick={handleSeatClick}
               availableSeats={availableSeatsForDate}
@@ -745,82 +849,23 @@ export default function Home() {
               bookedSeats={allBookingsForDate}
               currentUser={currentUser || undefined}
               timeSlot={bookingsMap[selectedDate || ""]?.timeSlot}
+              onToggleDrawer={() => { }}
+              showDrawerToggle={false}
             />
-          </Box>
-
-          {/* Tab Panel 1 - Reservation Form */}
-          <Box
-            role="tabpanel"
-            hidden={mobileTabValue !== 1}
-            id="mobile-tabpanel-1"
-            aria-labelledby="mobile-tab-1"
-            sx={{
-              p: 2,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <ReservationForm
-              selectedDate={selectedDate || undefined}
-              onDateClick={handleDateClick}
-              selectedSeat={selectedSeat || undefined}
-              selectedSeatsFromClick={selectedSeatsFromClick}
-              onSubmit={handleReservation}
-              onClear={handleClearBooking}
-              onDropdownSelectionChange={handleDropdownSelectionChange}
-              currentUser={currentUser || undefined}
-              userBookings={activeUserBookings}
-              allBookingsForDate={allBookingsForDate}
-              onBookingChange={async () => {
-                // Refresh all bookings for the selected date
-                const dateToRefresh = selectedDate || todayDate;
-                const allBookings = await bookingService.getBookingsForDate(
-                  dateToRefresh
-                );
-
-                // Transform bookings to the format expected by Table component
-                const bookedSeatsData = allBookings.map((booking) => ({
-                  seatId: booking.seatId,
-                  userId: booking.userId,
-                  timeSlot: booking.timeSlot,
-                }));
-                setAllBookingsForDate(bookedSeatsData);
-
-                // Refresh user bookings
-                const userData = await bookingService.loadUserData(
-                  currentUser!
-                );
-                setUserBookings(userData.userBookings);
-                // Refresh available seats for the selected date
-                if (selectedDate) {
-                  const reservedSeats = allBookings.map((b) => b.seatId);
-                  const seats = generateAllSeats(SEATING_CONFIG).filter(
-                    (seat) => !reservedSeats.includes(seat)
-                  );
-                  setAvailableSeatsForDate(seats);
-                  // If the selected seat was just deleted, clear it
-                  const stillBooked = userData.userBookings.find(
-                    (b) => b.date === selectedDate && b.seatId === selectedSeat
-                  );
-                  if (!stillBooked) {
-                    setSelectedSeat(null);
-                  }
-                }
-              }}
-            />
-          </Box>
+          )}
         </Box>
-      )}
+      </Box>
 
-      {/* Mobile Seat Selection Modal */}
-      <MobileSeatModal
+      <SeatModal
         open={mobileSeatModalOpen}
         onClose={handleMobileSeatModalClose}
         seatId={mobileSeatModalSeatId}
         selectedDate={mobileSeatModalDate}
         onSubmit={handleMobileSeatModalSubmit}
+        onRemove={handleMobileSeatModalRemove}
         currentUser={currentUser || undefined}
         allBookingsForDate={allBookingsForDate}
+        anchorPosition={modalAnchorPosition}
       />
 
       {/* Booking Error Snackbar */}
