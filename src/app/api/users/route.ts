@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { parseUsersCsvContent } from '../../../utils/bookingStorage';
 
 // User interface for type safety
 export interface User {
@@ -6,17 +7,50 @@ export interface User {
   email: string;
 }
 
-// In-memory storage with default users (from original users.csv)
-const inMemoryUsers: User[] = [
-  { user_id: '1234', email: 'dhuynh@strongtie.com' },
-  { user_id: 'U001', email: 'alice@mail.com' },
-  { user_id: 'U002', email: 'bob@mail.com' },
-  { user_id: 'U003', email: 'charlie@mail.com' },
-  { user_id: 'U004', email: 'hvu@strongtie.com' }
-];
+// In-memory storage - will be initialized from CSV if available
+let inMemoryUsers: User[] = [];
+let isInitialized = false;
+
+// Initialize in-memory storage from CSV file if available
+async function initializeFromCsv() {
+  if (isInitialized) return;
+  
+  try {
+    // Try to load from CSV file using fetch (works in both dev and production)
+    const response = await fetch(`${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : ''}/users.csv`);
+    
+    if (response.ok) {
+      const csvContent = await response.text();
+      inMemoryUsers = parseUsersCsvContent(csvContent);
+      console.log(`👥 Loaded ${inMemoryUsers.length} users from CSV file`);
+    } else {
+      console.log('⚠️ No users.csv found, starting with default users');
+      inMemoryUsers = [
+        { user_id: '1234', email: 'dhuynh@strongtie.com' },
+        { user_id: 'U001', email: 'alice@mail.com' },
+        { user_id: 'U002', email: 'bob@mail.com' },
+        { user_id: 'U003', email: 'charlie@mail.com' },
+        { user_id: 'U004', email: 'hvu@strongtie.com' }
+      ];
+    }
+  } catch {
+    console.log('⚠️ Could not load CSV (normal for Vercel deployments), using default users');
+    inMemoryUsers = [
+      { user_id: '1234', email: 'dhuynh@strongtie.com' },
+      { user_id: 'U001', email: 'alice@mail.com' },
+      { user_id: 'U002', email: 'bob@mail.com' },
+      { user_id: 'U003', email: 'charlie@mail.com' },
+      { user_id: 'U004', email: 'hvu@strongtie.com' }
+    ];
+  }
+  
+  isInitialized = true;
+}
 
 export async function GET() {
   try {
+    await initializeFromCsv();
+    
     console.log(`👥 GET /api/users - returning ${inMemoryUsers.length} users`);
     return NextResponse.json({ 
       success: true, 
@@ -34,6 +68,8 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    await initializeFromCsv();
+    
     const { user }: { user: User } = await request.json();
     console.log('👤 POST /api/users - Adding user:', user);
     
@@ -49,6 +85,7 @@ export async function POST(request: NextRequest) {
     }
     
     console.log(`✅ User ${user.user_id} saved successfully. Total users: ${inMemoryUsers.length}`);
+    
     return NextResponse.json({ 
       success: true, 
       user,

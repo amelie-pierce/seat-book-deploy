@@ -79,6 +79,7 @@ export default function ReservationForm({
   const [previousUser, setPreviousUser] = useState<string | undefined>(
     currentUser
   );
+  const [manuallyClearedDates, setManuallyClearedDates] = useState<Set<string>>(new Set());
 
   // Suppress unused variable warning - pendingBookings is used through setPendingBookings
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -95,14 +96,13 @@ export default function ReservationForm({
   const updateDropdownSelection = useCallback(
     (dateStr: string, seatId: string) => {
       if (onDropdownSelectionChange) {
-        const newSelections = {
-          ...selectedSeatsFromDropdown,
+        // Only send the single date change, parent will merge
+        onDropdownSelectionChange({
           [dateStr]: seatId,
-        };
-        onDropdownSelectionChange(newSelections);
+        });
       }
     },
-    [onDropdownSelectionChange, selectedSeatsFromDropdown]
+    [onDropdownSelectionChange]
   );
 
   // Helper function to clear all dropdown selections
@@ -280,8 +280,98 @@ export default function ReservationForm({
     [getAvailableSeats]
   );
 
+  // Find the nearest available seat for FULL_DAY time slot
+  const findNearestAvailableSeat = useCallback(
+    async (dateStr: string, zone: "zone1" | "zone2"): Promise<string | null> => {
+      try {
+        // Fetch all bookings for this specific date to check availability
+        const allBookingsForThisDate = await bookingService.getBookingsForDate(dateStr);
+        
+        // Convert bookings to the format needed for checking availability
+        const bookedSeatsData = allBookingsForThisDate.map((booking) => ({
+          seatId: booking.seatId,
+          userId: booking.userId,
+          timeSlot: booking.timeSlot,
+        }));
+
+        const availableSeats: string[] = [];
+
+        // Get tables for the selected zone
+        const zoneTables = zone === "zone1" 
+          ? SEATING_CONFIG.zones.zone1.tables 
+          : SEATING_CONFIG.zones.zone2.tables;
+
+        // Check each table in order
+        for (const tableLetter of zoneTables) {
+          // Determine seats per table based on zone and position
+          let seatsForTable = 8; // Default
+          
+          if (['B', 'E', 'H'].includes(tableLetter)) {
+            seatsForTable = 6;
+          } else if (['J', 'K', 'L', 'M', 'N', 'O'].includes(tableLetter)) {
+            seatsForTable = 6;
+          } else if (['P', 'Q', 'R', 'S', 'T', 'U'].includes(tableLetter)) {
+            seatsForTable = 4;
+          }
+
+          // Check each seat in order (1, 2, 3, ...)
+          for (let seatNum = 1; seatNum <= seatsForTable; seatNum++) {
+            const seatId = `${tableLetter}${seatNum}`;
+
+            // Check if this seat is available for FULL_DAY
+            const seatBookings = bookedSeatsData.filter(
+              (booking) => booking.seatId === seatId
+            );
+
+            let isAvailable = true;
+
+            if (seatBookings.length > 0) {
+              // Check for conflicts with FULL_DAY booking
+              const hasFullDayBooking = seatBookings.some(
+                (booking) => booking.timeSlot === "FULL_DAY"
+              );
+              const hasAmBooking = seatBookings.some(
+                (booking) => booking.timeSlot === "AM"
+              );
+              const hasPmBooking = seatBookings.some(
+                (booking) => booking.timeSlot === "PM"
+              );
+
+              // FULL_DAY requires both AM and PM to be free
+              isAvailable = !hasFullDayBooking && !hasAmBooking && !hasPmBooking;
+            }
+
+            if (isAvailable) {
+              availableSeats.push(seatId);
+            }
+          }
+
+          // If we found available seats in this table, return the first one
+          if (availableSeats.length > 0) {
+            return availableSeats[0];
+          }
+        }
+
+        return null;
+      } catch (error) {
+        console.error('Error finding nearest available seat:', error);
+        return null;
+      }
+    },
+    []
+  );
+
   // Handle seat selection from dropdown
   const handleSeatSelectionFromDropdown = (dateStr: string, seatId: string) => {
+    // If user is selecting a seat, remove from manually cleared dates
+    if (seatId && seatId !== "") {
+      setManuallyClearedDates(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(dateStr);
+        return newSet;
+      });
+    }
+    
     const newSelections = {
       ...selectedSeatsFromDropdown,
       [dateStr]: seatId,
@@ -366,6 +456,7 @@ export default function ReservationForm({
     setSelectedZones({});
     setLastSelectedSeat(undefined);
     setPendingBookings({});
+    setManuallyClearedDates(new Set());
     clearAllDropdownSelections();
     setShowSuccess(false);
   }, [clearAllDropdownSelections]);
@@ -470,6 +561,114 @@ export default function ReservationForm({
       return newTimeSlots;
     });
   }, [userBookings]);
+
+  // Auto-fill nearest available seats for dates without selections
+  useEffect(() => {
+    const autoFillSeats = async () => {
+      // Get available dates
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const currentHour = now.getHours();
+      const currentDay = today.getDay();
+      const dates: Date[] = [];
+
+      const isAfterFridayDeadline = currentDay === 5 && currentHour >= 15;
+
+      if (isAfterFridayDeadline) {
+        const nextMonday = new Date(today);
+        const daysUntilNextMonday = (8 - currentDay) % 7;
+        nextMonday.setDate(today.getDate() + daysUntilNextMonday);
+
+        for (let i = 0; i < 5; i++) {
+          const date = new Date(nextMonday);
+          date.setDate(nextMonday.getDate() + i);
+          dates.push(date);
+        }
+      } else {
+        const monday = new Date(today);
+        const daysFromMonday = (currentDay + 6) % 7;
+        monday.setDate(today.getDate() - daysFromMonday);
+
+        for (let i = 0; i < 5; i++) {
+          const date = new Date(monday);
+          date.setDate(monday.getDate() + i);
+          dates.push(date);
+        }
+      }
+
+      // Auto-fill seats for dates without selections
+      const autoFillSelections: { [date: string]: string } = {};
+      
+      console.log(`🔄 Auto-fill running for ${dates.length} dates`);
+      
+      for (const date of dates) {
+        const dateStr = formatLocalDate(date);
+        
+        console.log(`🔄 Checking date ${dateStr}:`);
+        
+        // Skip past dates - only auto-fill today and future dates
+        if (date < today) {
+          console.log(`  ⏭️ Skipped - past date`);
+          continue;
+        }
+        
+        // Skip if already has a booking
+        const hasBooking = userBookings.some(b => b.date === dateStr);
+        if (hasBooking) {
+          console.log(`  ⏭️ Skipped - has existing booking`);
+          continue;
+        }
+        
+        // Skip if manually cleared by user
+        if (manuallyClearedDates.has(dateStr)) {
+          console.log(`  ⏭️ Skipped - manually cleared`);
+          continue;
+        }
+        
+        // Skip if already has a selection
+        const hasSelection = selectedSeatsFromDropdown[dateStr] || 
+                            selectedSeatsFromClick[dateStr] ||
+                            (selectedDate === dateStr && selectedSeat);
+        if (hasSelection) {
+          console.log(`  ⏭️ Skipped - already has selection: ${selectedSeatsFromDropdown[dateStr] || selectedSeatsFromClick[dateStr] || selectedSeat}`);
+          continue;
+        }
+        
+        // Get the zone for this date
+        const zone = selectedZones[dateStr] || "zone1";
+        
+        console.log(`  ✅ Auto-filling for zone ${zone}...`);
+        
+        // Find nearest available seat for FULL_DAY
+        const nearestSeat = await findNearestAvailableSeat(dateStr, zone);
+        
+        if (nearestSeat) {
+          console.log(`  ✅ Found nearest seat: ${nearestSeat}`);
+          autoFillSelections[dateStr] = nearestSeat;
+        } else {
+          console.log(`  ❌ No available seat found`);
+        }
+      }
+
+      // Apply auto-fill selections if any
+      console.log(`🔄 Auto-fill complete. Selections to apply:`, autoFillSelections);
+      if (Object.keys(autoFillSelections).length > 0 && onDropdownSelectionChange) {
+        onDropdownSelectionChange(autoFillSelections);
+      }
+    };
+
+    autoFillSeats();
+  }, [
+    userBookings, 
+    selectedSeatsFromDropdown, 
+    selectedSeatsFromClick, 
+    selectedSeat, 
+    selectedDate, 
+    selectedZones, 
+    findNearestAvailableSeat, 
+    onDropdownSelectionChange,
+    manuallyClearedDates
+  ]);
 
   // Store dropdown selections as pending bookings
   useEffect(() => {
@@ -699,6 +898,27 @@ export default function ReservationForm({
     }
   };
 
+  const handleClearDate = (date: string) => {
+    console.log(`🧹 Clear button clicked for date: ${date}`);
+    console.log(`🧹 Current seat for ${date}:`, getCurrentSeat(date));
+    console.log(`🧹 selectedSeatsFromDropdown[${date}]:`, selectedSeatsFromDropdown[date]);
+    
+    // Mark this date as manually cleared to prevent auto-fill
+    setManuallyClearedDates(prev => new Set(prev).add(date));
+    
+    // Clear seat selection for this date (table and desk will show placeholders)
+    updateDropdownSelection(date, "");
+    
+    // Clear click selection in parent
+    if (onClearClickSelection) {
+      onClearClickSelection(date);
+    }
+    
+    console.log(`🧹 Clear completed for date: ${date}`);
+    
+    // Note: We don't reset time slot or zone - only clear the seat selection
+  };
+
   const getTimeSlotForDate = (dateStr: string) => {
     // First check if there's an existing booking
     const existingBooking = userBookings.find((b) => b.date === dateStr);
@@ -788,6 +1008,7 @@ export default function ReservationForm({
         // Clear dropdown selections after submission
         clearAllDropdownSelections();
         setPendingBookings({});
+        setManuallyClearedDates(new Set()); // Clear manually cleared dates after booking
 
         // Notify parent about clearing dropdown selections
         if (onDropdownSelectionChange) {
@@ -1375,8 +1596,31 @@ export default function ReservationForm({
                   </Box>
                 </Box>
 
-                {/* Remove Button */}
-                <Box sx={{ display: "flex", alignItems: "center" }}>
+                {/* Clear and Remove Buttons */}
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1, alignItems: "center" }}>
+                  {/* Clear Button */}
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    sx={{
+                      color: "#6B7280",
+                      borderColor: "#E5E7EB",
+                      textTransform: "none",
+                      fontWeight: 600,
+                      minWidth: 80,
+                      height: "fit-content",
+                      "&:hover": {
+                        borderColor: "#9CA3AF",
+                        backgroundColor: "#F9FAFB",
+                      },
+                    }}
+                    onClick={() => handleClearDate(dateStr)}
+                    disabled={isPastDate || (!selectedSeatsFromDropdown[dateStr] && !selectedSeatsFromClick[dateStr] && !(selectedDate === dateStr && selectedSeat))}
+                  >
+                    Clear
+                  </Button>
+
+                  {/* Remove Button */}
                   <Button
                     variant="outlined"
                     size="small"
