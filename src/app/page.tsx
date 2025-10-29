@@ -557,9 +557,37 @@ export default function Home() {
   }) => {
     console.log(`📋 Dropdown selections received:`, selections);
 
-    setSelectedSeatsFromDropdown(selections);
+    // Merge with existing selections, removing empty values
+    setSelectedSeatsFromDropdown((prev) => {
+      console.log(`📋 Previous dropdown state:`, prev);
+      const newState = { ...prev };
+      Object.entries(selections).forEach(([date, seatId]) => {
+        console.log(`📋 Processing date ${date} with seatId: "${seatId}"`);
+        if (seatId === "" || !seatId) {
+          // Remove the property entirely when clearing
+          console.log(`📋 Deleting property for date ${date}`);
+          delete newState[date];
+        } else {
+          console.log(`📋 Setting ${date} = ${seatId}`);
+          newState[date] = seatId;
+        }
+      });
+      console.log(`📋 New dropdown state:`, newState);
+      return newState;
+    });
     // Sync click selections with dropdown selections to keep them in sync
-    setSelectedSeatsFromClick(selections);
+    setSelectedSeatsFromClick((prev) => {
+      const newState = { ...prev };
+      Object.entries(selections).forEach(([date, seatId]) => {
+        if (seatId === "" || !seatId) {
+          // Remove the property entirely when clearing
+          delete newState[date];
+        } else {
+          newState[date] = seatId;
+        }
+      });
+      return newState;
+    });
 
     // Update main selectedSeat for current date to keep seating layout in sync
     if (selectedDate) {

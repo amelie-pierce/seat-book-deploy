@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { bookingService } from "../services/bookingService";
+import { SEATING_CONFIG } from "../config/seatingConfig";
 import {
   Typography,
   Button,
@@ -54,9 +55,21 @@ export default function ReservationForm({
   onClearClickSelection,
   allBookingsForDate = [],
 }: ReservationFormProps) {
+  // Helper function to format date without timezone issues
+  const formatLocalDate = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showRemoveSuccess, setShowRemoveSuccess] = useState(false);
   const [selectedTimeSlots, setSelectedTimeSlots] = useState<{
     [date: string]: TimeSlotType;
+  }>({});
+  const [selectedZones, setSelectedZones] = useState<{
+    [date: string]: "zone1" | "zone2";
   }>({});
   const [lastSelectedSeat, setLastSelectedSeat] = useState<string | undefined>(
     undefined
@@ -83,14 +96,13 @@ export default function ReservationForm({
   const updateDropdownSelection = useCallback(
     (dateStr: string, seatId: string) => {
       if (onDropdownSelectionChange) {
-        const newSelections = {
-          ...selectedSeatsFromDropdown,
+        // Only send the single date change, parent will merge
+        onDropdownSelectionChange({
           [dateStr]: seatId,
-        };
-        onDropdownSelectionChange(newSelections);
+        });
       }
     },
-    [onDropdownSelectionChange, selectedSeatsFromDropdown]
+    [onDropdownSelectionChange]
   );
 
   // Helper function to clear all dropdown selections
@@ -149,16 +161,39 @@ export default function ReservationForm({
 
   // Get available seats based on selected time slot and date
   const getAvailableSeats = useCallback(
-    (dateStr: string, timeSlot: TimeSlotType | ""): string[] => {
+    (dateStr: string, timeSlot: TimeSlotType | "", zone?: "zone1" | "zone2"): string[] => {
       if (!dateStr || !timeSlot) return [];
 
       const availableSeats: string[] = [];
 
-      // Generate all possible seats (assuming tables A-H, each with 6 seats)
-      const tables = ["A", "B", "C", "D", "E", "F", "G", "H"];
+      // Get tables for the selected zone, or all tables if no zone specified
+      let tables: string[];
+      if (zone === "zone1") {
+        tables = SEATING_CONFIG.zones.zone1.tables;
+      } else if (zone === "zone2") {
+        tables = SEATING_CONFIG.zones.zone2.tables;
+      } else {
+        // If no zone specified, include all tables
+        tables = [...SEATING_CONFIG.zones.zone1.tables, ...SEATING_CONFIG.zones.zone2.tables];
+      }
 
       tables.forEach((tableLetter) => {
-        for (let seatNum = 1; seatNum <= 6; seatNum++) {
+        // Determine seats per table based on zone and position
+        let seatsForTable = 8; // Default
+        
+        // Zone A (A-I): Tables B, E, H (2nd column in 3x3 grid) have 6 seats
+        if (['B', 'E', 'H'].includes(tableLetter)) {
+          seatsForTable = 6;
+        }
+        // Zone B (J-U): First row (J-O) have 6 seats, second row (P-U) have 4 seats
+        else if (['J', 'K', 'L', 'M', 'N', 'O'].includes(tableLetter)) {
+          seatsForTable = 6;
+        }
+        else if (['P', 'Q', 'R', 'S', 'T', 'U'].includes(tableLetter)) {
+          seatsForTable = 4;
+        }
+
+        for (let seatNum = 1; seatNum <= seatsForTable; seatNum++) {
           const seatId = `${tableLetter}${seatNum}`;
 
           // Check if this seat is available for the selected time slot
@@ -206,16 +241,29 @@ export default function ReservationForm({
 
   // Group available seats by table for dropdown
   const getGroupedAvailableSeats = useCallback(
-    (dateStr: string, timeSlot: TimeSlotType | "") => {
-      const availableSeats = getAvailableSeats(dateStr, timeSlot);
+    (dateStr: string, timeSlot: TimeSlotType | "", zone?: "zone1" | "zone2") => {
+      const availableSeats = getAvailableSeats(dateStr, timeSlot, zone);
       const grouped: { [table: string]: string[] } = {};
+
+      // Get tables for the selected zone
+      let zoneTables: string[];
+      if (zone === "zone1") {
+        zoneTables = SEATING_CONFIG.zones.zone1.tables;
+      } else if (zone === "zone2") {
+        zoneTables = SEATING_CONFIG.zones.zone2.tables;
+      } else {
+        zoneTables = [...SEATING_CONFIG.zones.zone1.tables, ...SEATING_CONFIG.zones.zone2.tables];
+      }
 
       availableSeats.forEach((seatId) => {
         const table = seatId.charAt(0);
-        if (!grouped[table]) {
-          grouped[table] = [];
+        // Only include seats from tables in the selected zone
+        if (zoneTables.includes(table)) {
+          if (!grouped[table]) {
+            grouped[table] = [];
+          }
+          grouped[table].push(seatId);
         }
-        grouped[table].push(seatId);
       });
 
       // Sort seats within each table
@@ -315,6 +363,7 @@ export default function ReservationForm({
   // Reset all state when user changes (login/logout)
   const resetAllState = useCallback(() => {
     setSelectedTimeSlots({});
+    setSelectedZones({});
     setLastSelectedSeat(undefined);
     setPendingBookings({});
     clearAllDropdownSelections();
@@ -359,6 +408,67 @@ export default function ReservationForm({
         return newState;
       });
     }
+  }, [userBookings]);
+
+  // Initialize zones with default "zone1" and time slots with default "FULL_DAY" for dates without bookings
+  useEffect(() => {
+    // Get available dates
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const currentHour = now.getHours();
+    const currentDay = today.getDay();
+    const dates: Date[] = [];
+
+    const isAfterFridayDeadline = currentDay === 5 && currentHour >= 15;
+
+    if (isAfterFridayDeadline) {
+      const nextMonday = new Date(today);
+      const daysUntilNextMonday = (8 - currentDay) % 7;
+      nextMonday.setDate(today.getDate() + daysUntilNextMonday);
+
+      for (let i = 0; i < 5; i++) {
+        const date = new Date(nextMonday);
+        date.setDate(nextMonday.getDate() + i);
+        dates.push(date);
+      }
+    } else {
+      const monday = new Date(today);
+      const daysFromMonday = (currentDay + 6) % 7;
+      monday.setDate(today.getDate() - daysFromMonday);
+
+      for (let i = 0; i < 5; i++) {
+        const date = new Date(monday);
+        date.setDate(monday.getDate() + i);
+        dates.push(date);
+      }
+    }
+
+    // Initialize zones and time slots for all available dates
+    setSelectedZones((prev) => {
+      const newZones = { ...prev };
+      dates.forEach((date) => {
+        const dateStr = formatLocalDate(date);
+        // Only set default if not already set
+        if (!newZones[dateStr]) {
+          newZones[dateStr] = "zone1";
+        }
+      });
+      return newZones;
+    });
+
+    // Initialize time slots with "FULL_DAY" for dates without existing bookings
+    setSelectedTimeSlots((prev) => {
+      const newTimeSlots = { ...prev };
+      dates.forEach((date) => {
+        const dateStr = formatLocalDate(date);
+        // Only set default if not already set and no existing booking
+        const hasBooking = userBookings.some(b => b.date === dateStr);
+        if (!newTimeSlots[dateStr] && !hasBooking) {
+          newTimeSlots[dateStr] = "FULL_DAY";
+        }
+      });
+      return newTimeSlots;
+    });
   }, [userBookings]);
 
   // Store dropdown selections as pending bookings
@@ -556,8 +666,11 @@ export default function ReservationForm({
       [date]: timeSlot,
     }));
 
-    // Clear seat selections that are not available for the new time slot
-    const availableSeats = getAvailableSeats(date, timeSlot);
+    // Get the current zone for this date
+    const currentZone = selectedZones[date] || "zone1";
+
+    // Clear seat selections that are not available for the new time slot and zone
+    const availableSeats = getAvailableSeats(date, timeSlot, currentZone);
 
     // Clear both dropdown and click selections if not available for this time slot (they're kept in sync)
     if (
@@ -570,6 +683,38 @@ export default function ReservationForm({
         onClearClickSelection(date);
       }
     }
+  };
+
+  const handleZoneChange = (date: string, zone: "zone1" | "zone2") => {
+    setSelectedZones((prev) => ({
+      ...prev,
+      [date]: zone,
+    }));
+
+    // Always clear seat selections when zone changes to reset to default placeholders
+    updateDropdownSelection(date, "");
+    // Also clear click selection in parent
+    if (onClearClickSelection) {
+      onClearClickSelection(date);
+    }
+  };
+
+  const handleClearDate = (date: string) => {
+    console.log(`🧹 Clear button clicked for date: ${date}`);
+    console.log(`🧹 Current seat for ${date}:`, getCurrentSeat(date));
+    console.log(`🧹 selectedSeatsFromDropdown[${date}]:`, selectedSeatsFromDropdown[date]);
+    
+    // Clear seat selection for this date (table and desk will show placeholders)
+    updateDropdownSelection(date, "");
+    
+    // Clear click selection in parent
+    if (onClearClickSelection) {
+      onClearClickSelection(date);
+    }
+    
+    console.log(`🧹 Clear completed for date: ${date}`);
+    
+    // Note: We don't reset time slot or zone - only clear the seat selection
   };
 
   const getTimeSlotForDate = (dateStr: string) => {
@@ -586,6 +731,26 @@ export default function ReservationForm({
     return "";
   };
 
+  const getZoneForDate = (dateStr: string): "zone1" | "zone2" => {
+    // First check if there's an existing booking and determine its zone
+    const existingBooking = userBookings.find((b) => b.date === dateStr);
+    if (existingBooking?.seatId) {
+      const tableLetter = existingBooking.seatId.charAt(0);
+      // Check which zone this table belongs to
+      if (SEATING_CONFIG.zones.zone1.tables.includes(tableLetter)) {
+        return "zone1";
+      } else if (SEATING_CONFIG.zones.zone2.tables.includes(tableLetter)) {
+        return "zone2";
+      }
+    }
+    // Then check if there's a selected zone
+    if (selectedZones[dateStr]) {
+      return selectedZones[dateStr];
+    }
+    // Default to zone1
+    return "zone1";
+  };
+
   const handleSubmit = useCallback(
     (event: React.FormEvent) => {
       event.preventDefault();
@@ -597,10 +762,15 @@ export default function ReservationForm({
       }> = [];
       const processedDates = new Set<string>();
 
+      // Helper function to validate seat ID (not a placeholder like "A0")
+      const isValidSeatId = (seatId: string): boolean => {
+        return !!seatId && !seatId.endsWith("0");
+      };
+
       // 1. Collect from dropdown selections
       Object.entries(selectedSeatsFromDropdown).forEach(([date, seatId]) => {
         const timeSlot = selectedTimeSlots[date];
-        if (seatId && timeSlot) {
+        if (isValidSeatId(seatId) && timeSlot) {
           allBookings.push({ date, seatId, timeSlot });
           processedDates.add(date);
         }
@@ -609,7 +779,7 @@ export default function ReservationForm({
       // 2. Collect from clicked seat selections
       Object.entries(selectedSeatsFromClick).forEach(([date, seatId]) => {
         const timeSlot = selectedTimeSlots[date];
-        if (seatId && timeSlot && !processedDates.has(date)) {
+        if (isValidSeatId(seatId) && timeSlot && !processedDates.has(date)) {
           allBookings.push({ date, seatId, timeSlot });
           processedDates.add(date);
         }
@@ -618,6 +788,7 @@ export default function ReservationForm({
       // 3. Add current seat selection if it exists and not already processed
       if (
         selectedSeat &&
+        isValidSeatId(selectedSeat) &&
         selectedDate &&
         selectedTimeSlots[selectedDate] &&
         !processedDates.has(selectedDate)
@@ -685,10 +856,15 @@ export default function ReservationForm({
     let count = 0;
     const processedDates = new Set<string>();
 
+    // Helper function to validate seat ID (not a placeholder like "A0")
+    const isValidSeatId = (seatId: string): boolean => {
+      return !!seatId && !seatId.endsWith("0");
+    };
+
     // Count dropdown selections
     Object.entries(selectedSeatsFromDropdown).forEach(([date, seatId]) => {
       const timeSlot = selectedTimeSlots[date];
-      if (seatId && timeSlot) {
+      if (isValidSeatId(seatId) && timeSlot) {
         count++;
         processedDates.add(date);
       }
@@ -697,7 +873,7 @@ export default function ReservationForm({
     // Count clicked seat selections
     Object.entries(selectedSeatsFromClick).forEach(([date, seatId]) => {
       const timeSlot = selectedTimeSlots[date];
-      if (seatId && timeSlot && !processedDates.has(date)) {
+      if (isValidSeatId(seatId) && timeSlot && !processedDates.has(date)) {
         count++;
         processedDates.add(date);
       }
@@ -706,6 +882,7 @@ export default function ReservationForm({
     // Count current selection if not already processed
     if (
       selectedSeat &&
+      isValidSeatId(selectedSeat) &&
       selectedDate &&
       selectedTimeSlots[selectedDate] &&
       !processedDates.has(selectedDate)
@@ -789,47 +966,23 @@ export default function ReservationForm({
         </Typography>
 
         {/* Date Range Display */}
-        <Box sx={{ display: "flex", justifyContent: 'space-between', alignItems: "center", mb: 2 }}>
-          {availableDates.length > 0 && (
-            <Typography
-              variant="body1"
-              component="p"
-              fontWeight={600}
-              color="#000"
-            >
-              {availableDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {availableDates[availableDates.length - 1].toLocaleDateString('en-US', { day: 'numeric' })}
-            </Typography>
-          )}
-          <Button
-            type="submit"
-            variant="contained"
-            size="large"
-            sx={{
-              backgroundColor: "#FF5208",
-              textTransform: "none",
-              fontWeight: 600,
-              "&:hover": {
-                backgroundColor: "#E64A07",
-              },
-              "&:disabled": {
-                backgroundColor: "#E5E7EB",
-              },
-            }}
-            disabled={!isFormValid}
+        {availableDates.length > 0 && (
+          <Typography
+            variant="body1"
+            component="p"
+            mb={3}
+            fontWeight={600}
+            color="#000"
           >
-            {totalBookings === 0
-              ? "Select a Seat"
-              : totalBookings === 1
-                ? "Reserve Seat"
-                : `Reserve ${totalBookings} Seats`}
-          </Button>
-        </Box>
+            {availableDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {availableDates[availableDates.length - 1].toLocaleDateString('en-US', { day: 'numeric' })}
+          </Typography>
+        )}
 
         {/* Date, Seat, and Delete Button Row */}
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
           {/* Generate dates based on new logic */}
           {availableDates.map((date, idx) => {
-            const dateStr = date.toISOString().split("T")[0];
+            const dateStr = formatLocalDate(date);
             const booking = userBookings.find((b) => b.date === dateStr);
 
             // Check if date is in the past
@@ -902,8 +1055,13 @@ export default function ReservationForm({
                     Zone
                   </Typography>
                   <ToggleButtonGroup
-                    value={booking ? "A" : "A"} // Default to Zone A for now
+                    value={getZoneForDate(dateStr)}
                     exclusive
+                    onChange={(e, newValue) => {
+                      if (newValue !== null && !booking) {
+                        handleZoneChange(dateStr, newValue as "zone1" | "zone2");
+                      }
+                    }}
                     size="small"
                     sx={{
                       width: "100%",
@@ -914,9 +1072,10 @@ export default function ReservationForm({
                         },
                       },
                     }}
+                    disabled={!!booking || isPastDate}
                   >
                     <ToggleButton
-                      value="A"
+                      value="zone1"
                       sx={{
                         flex: 1,
                         textTransform: "none",
@@ -940,7 +1099,7 @@ export default function ReservationForm({
                       Zone A
                     </ToggleButton>
                     <ToggleButton
-                      value="B"
+                      value="zone2"
                       sx={{
                         flex: 1,
                         textTransform: "none",
@@ -981,6 +1140,7 @@ export default function ReservationForm({
                     }}
                     size="small"
                     sx={{
+                      textWrap: 'nowrap',
                       width: "100%",
                       "& .MuiToggleButtonGroup-grouped": {
                         border: "1px solid #E5E7EB",
@@ -1082,36 +1242,47 @@ export default function ReservationForm({
                           const currentSeat = getCurrentSeat(dateStr);
                           const currentTable = currentSeat ? currentSeat.charAt(0) : "";
 
-                          if (table === currentTable) {
-                            // Same table, keep the desk
-                            handleSeatSelectionFromDropdown(dateStr, currentSeat);
+                            if (table === currentTable && currentSeat) {
+                              // Same table, keep the desk
+                              handleSeatSelectionFromDropdown(dateStr, currentSeat);
+                            } else {
+                              // Different table, set table with placeholder to enable desk dropdown
+                              handleSeatSelectionFromDropdown(dateStr, `${table}0`);
+                            }
                           } else {
-                            // Different table, reset to empty
+                            // Clear selection if empty table is selected
                             handleSeatSelectionFromDropdown(dateStr, "");
                           }
-                        }
-                      }}
-                      displayEmpty
-                      sx={{
-                        borderRadius: 1,
-                        backgroundColor: "#FFFFFF",
-                        "& .MuiOutlinedInput-notchedOutline": {
-                          borderColor: "#E5E7EB",
-                        },
-                      }}
-                      disabled={!!booking || isPastDate}
-                    >
-                      <MenuItem value="">
-                        <em>Table</em>
-                      </MenuItem>
-                      {["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"].map((table) => (
-                        <MenuItem key={table} value={table}>
-                          Table {table}
+                        }}
+                        displayEmpty
+                        sx={{
+                          borderRadius: 1,
+                          backgroundColor: "#FFFFFF",
+                          "& .MuiOutlinedInput-notchedOutline": {
+                            borderColor: "#E5E7EB",
+                          },
+                        }}
+                        disabled={!!booking || isPastDate}
+                      >
+                        <MenuItem value="">
+                          <em>Table</em>
                         </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Box>
+                        {(() => {
+                          // Get tables for the selected zone
+                          const currentZone = getZoneForDate(dateStr);
+                          const zoneTables = currentZone === "zone1" 
+                            ? SEATING_CONFIG.zones.zone1.tables 
+                            : SEATING_CONFIG.zones.zone2.tables;
+                          
+                          return zoneTables.map((table) => (
+                            <MenuItem key={table} value={table}>
+                              Table {table}
+                            </MenuItem>
+                          ));
+                        })()}
+                      </Select>
+                    </FormControl>
+                  </Box>
 
                 {/* Desk Selection */}
                 <Box sx={{ flex: 1 }}>
@@ -1120,7 +1291,14 @@ export default function ReservationForm({
                   </Typography>
                   <FormControl size="small" fullWidth>
                     <Select
-                      value={getCurrentSeat(dateStr)}
+                      value={(() => {
+                          const seat = getCurrentSeat(dateStr);
+                          // If seat ends with "0", it's a placeholder, show empty
+                          if (seat && seat.endsWith("0")) {
+                            return "";
+                          }
+                          return seat;
+                        })()}
                       onChange={(e) =>
                         handleSeatSelectionFromDropdown(
                           dateStr,
@@ -1135,7 +1313,12 @@ export default function ReservationForm({
                           borderColor: "#E5E7EB",
                         },
                       }}
-                      disabled={!!booking || isPastDate || !selectedTimeSlots[dateStr]}
+                      disabled={
+                          !!booking || 
+                          isPastDate || 
+                          !selectedTimeSlots[dateStr] || 
+                          !(getCurrentSeat(dateStr) ? getCurrentSeat(dateStr).charAt(0) : "")
+                        }
                     >
                       <MenuItem value="">
                         <em>Desk No.</em>
@@ -1150,14 +1333,18 @@ export default function ReservationForm({
                           );
                         }
 
-                        if (!selectedTimeSlots[dateStr]) {
-                          return null; // No seats shown until time slot is selected
-                        }
+                          if (!selectedTimeSlots[dateStr]) {
+                            return null; // No seats shown until time slot is selected
+                          }
 
-                        const groupedSeats = getGroupedAvailableSeats(
-                          dateStr,
-                          selectedTimeSlots[dateStr]
-                        );
+                          // Get the current zone for filtering
+                          const currentZone = getZoneForDate(dateStr);
+
+                          const groupedSeats = getGroupedAvailableSeats(
+                            dateStr,
+                            selectedTimeSlots[dateStr],
+                            currentZone
+                          );
 
                         // Get the selected table
                         const currentSeat = getCurrentSeat(dateStr);
@@ -1178,7 +1365,7 @@ export default function ReservationForm({
                             ));
                         }
 
-                        // Otherwise show all available seats grouped by table
+                        // Otherwise show all available seats grouped by table (filtered by zone)
                         return Object.keys(groupedSeats)
                           .sort()
                           .map((tableLetter) => [
@@ -1203,8 +1390,9 @@ export default function ReservationForm({
                   </FormControl>
                 </Box>
 
-                {/* Remove Button */}
-                <Box sx={{  }}>
+                {/* Clear and Remove Buttons */}
+                <Box>
+                  {/* Remove Button */}
                   <p>&nbsp;</p>
                   <Button
                     variant="outlined"
@@ -1245,6 +1433,7 @@ export default function ReservationForm({
                         });
                         if (onBookingChange) await onBookingChange();
                         handleClear(); // Clear the time slot selection
+                        setShowRemoveSuccess(true); // Show success toast
                       } catch (err) {
                         console.error("Failed to cancel booking:", err);
                       }
@@ -1258,6 +1447,37 @@ export default function ReservationForm({
             );
           })}
         </Box>
+
+        <Box
+          component="form"
+          onSubmit={handleSubmit}
+          sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+        >
+          <Button
+            type="submit"
+            variant="contained"
+            size="large"
+            sx={{
+              mt: 2,
+              backgroundColor: "#FF5208",
+              textTransform: "none",
+              fontWeight: 600,
+              "&:hover": {
+                backgroundColor: "#E64A07",
+              },
+              "&:disabled": {
+                backgroundColor: "#E5E7EB",
+              },
+            }}
+            disabled={!isFormValid}
+          >
+            {totalBookings === 0
+              ? "Select a Seat"
+              : totalBookings === 1
+                ? "Reserve Seat"
+                : `Reserve ${totalBookings} Seats`}
+          </Button>
+        </Box>
       </Container>
 
       <Snackbar
@@ -1266,9 +1486,17 @@ export default function ReservationForm({
         onClose={() => setShowSuccess(false)}
       >
         <Alert severity="success" onClose={() => setShowSuccess(false)}>
-          {totalBookings === 1
-            ? "Reservation submitted successfully!"
-            : `${totalBookings} reservations submitted successfully!`}
+          Reservation(s) submitted successfully
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={showRemoveSuccess}
+        autoHideDuration={4000}
+        onClose={() => setShowRemoveSuccess(false)}
+      >
+        <Alert severity="success" onClose={() => setShowRemoveSuccess(false)}>
+          Booking removed successfully!
         </Alert>
       </Snackbar>
     </>
