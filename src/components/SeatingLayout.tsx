@@ -24,7 +24,6 @@ interface SeatingLayoutProps {
   currentUser?: string;
   timeSlot?: "AM" | "PM" | "FULL_DAY";
   onToggleDrawer?: () => void;
-  showDrawerToggle?: boolean;
 }
 
 export default function SeatingLayout({
@@ -38,8 +37,6 @@ export default function SeatingLayout({
   bookedSeats = [],
   currentUser,
   timeSlot,
-  onToggleDrawer,
-  showDrawerToggle = false,
 }: SeatingLayoutProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const transformRef = useRef<any>(null);
@@ -158,73 +155,6 @@ export default function SeatingLayout({
         width: "100%",
       }}
     >
-      {/* Date header chips - full width and sticky at top */}
-      <Box
-        sx={{
-          width: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          p: 2,
-          background: "#efefef",
-          position: "sticky",
-          top: 0,
-          zIndex: 100,
-          overflowX: "auto",
-          gap: 2,
-        }}
-      >
-        <Box sx={{ display: "flex", gap: 1, flex: 1, alignItems: "flex-start" }}>
-          {dateChips.dates.map((date) => {
-            const dateStr = formatLocalDate(date);
-            const isCurrentDate = dateStr === selectedDate;
-            // console.log('date', date, 'datestring', dateStr);
-
-            // Check if date is in the past (same logic as ReservationForm)
-            const isPastDate =
-              !dateChips.isAfterFridayDeadline && date < dateChips.today;
-
-            return (
-              <Chip
-                icon={<EventNoteIcon fontSize="small" color="inherit" />}
-                clickable={!isPastDate}
-                key={dateStr}
-                label={date.toLocaleDateString()}
-                sx={{
-                  cursor: isPastDate ? "not-allowed" : "pointer",
-                  opacity: isPastDate ? 0.5 : 1,
-                  fontSize: "0.875rem",
-                  borderRadius: 1,
-                  color: isCurrentDate ? "#fff" : "#1C262C",
-                  backgroundColor: isCurrentDate ? "primary.main" : "#fff",
-                  fontWeight: 600,
-                }}
-                onClick={
-                  onDateClick && !isPastDate
-                    ? () => onDateClick(dateStr)
-                    : undefined
-                }
-              />
-            );
-          })}
-        </Box>
-
-        {/* Drawer Toggle Button - Only show on desktop when enabled */}
-        {showDrawerToggle && onToggleDrawer && (
-          <IconButton
-            onClick={onToggleDrawer}
-            sx={{
-              color: "#000000",
-              borderRadius: 1,
-              "&:hover": {
-                backgroundColor: "rgba(0, 0, 0, 0.04)",
-              },
-            }}
-          >
-            <MenuIcon />
-          </IconButton>
-        )}
-      </Box>
       {/* Zoomable tables section */}
       <Box
         sx={{
@@ -233,6 +163,9 @@ export default function SeatingLayout({
           overflow: "hidden",
           position: "relative",
           minHeight: 400,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
         }}
       >
         <TransformWrapper
@@ -257,30 +190,89 @@ export default function SeatingLayout({
         >
           {({ zoomIn, zoomOut, zoomToElement }) => (
             <>
-              {/* Zone Focus Controls */}
+              {/* Date header chips - full width and sticky at top */}
               <Box
                 sx={{
-                  position: "absolute",
-                  top: 20,
-                  right: 10,
-                  zIndex: 1000,
-                  display: "flex",
-                  gap: 2,
-                  padding: 1,
+                  display: "inline-flex",
+                  alignItems: { xs: "flex-start", sm: "center" },
+                  justifyContent: "space-between",
+                  px: 2,
+                  py: 1,
+                  background: "#F2F2F2",
+                  overflow: "hidden",
+                  gap: { xs: 2, sm: 4 },
+                  borderRadius: 2,
+                  overflowY: "hidden",
+                  flexDirection: { xs: "column", sm: "row" },
+                  width: { xs: '100%', sm: 'auto' }
                 }}
               >
-                <ZoneButton
-                  label="Zone A"
-                  onClick={() => handleZoneFocus("zone1", zoomToElement)}
-                />
-                <ZoneButton
-                  label="Zone B"
-                  onClick={() => handleZoneFocus("zone2", zoomToElement)}
-                />
-                <ZoneButton
-                  label="Full Map"
-                  onClick={() => handleZoneFocus("meeting", zoomToElement)}
-                />
+                <Box sx={{
+                  display: "flex",
+                  gap: 1, flex: 1,
+                  alignItems: "center",
+                  overflowX: "auto",
+                  width: { xs: '100%', sm: 'auto' },
+                  py: 1, overflowY: 'hidden'
+                }}>
+                  <Typography fontWeight={600}>Date: </Typography>
+                  {dateChips.dates.map((date) => {
+                    const dateStr = formatLocalDate(date);
+                    const isCurrentDate = dateStr === selectedDate;
+                    // console.log('date', date, 'datestring', dateStr);
+
+                    // Check if date is in the past (same logic as ReservationForm)
+                    const isPastDate =
+                      !dateChips.isAfterFridayDeadline && date < dateChips.today;
+
+                    return (
+                      <Chip
+                        icon={<EventNoteIcon fontSize="small" color="inherit" />}
+                        clickable={!isPastDate}
+                        key={dateStr}
+                        label={date.toLocaleDateString()}
+                        sx={{
+                          cursor: isPastDate ? "not-allowed" : "pointer",
+                          opacity: isPastDate ? 0.5 : 1,
+                          fontSize: "0.875rem",
+                          borderRadius: 1,
+                          color: isCurrentDate ? "#fff" : "#1C262C",
+                          backgroundColor: isCurrentDate ? "primary.main" : "#fff",
+                          fontWeight: 600,
+                          display: 'inline-flex',
+                        }}
+                        onClick={
+                          onDateClick && !isPastDate
+                            ? () => onDateClick(dateStr)
+                            : undefined
+                        }
+                      />
+                    );
+                  })}
+                </Box>
+                {/* Zone Focus Controls */}
+                <Box
+                  sx={{
+                    display: "flex",
+                    gap: 1,
+                    padding: 1,
+                    alignItems: "center",
+                  }}
+                >
+                  <Typography fontWeight={600}>Location: </Typography>
+                  <ZoneButton
+                    label="Zone A"
+                    onClick={() => handleZoneFocus("zone1", zoomToElement)}
+                  />
+                  <ZoneButton
+                    label="Zone B"
+                    onClick={() => handleZoneFocus("zone2", zoomToElement)}
+                  />
+                  <ZoneButton
+                    label="Full Map"
+                    onClick={() => handleZoneFocus("meeting", zoomToElement)}
+                  />
+                </Box>
               </Box>
               {/* Zoom Control Buttons */}
               <Box

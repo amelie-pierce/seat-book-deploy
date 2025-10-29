@@ -674,7 +674,7 @@ export default function Home() {
     <Container
       maxWidth={false}
       disableGutters
-      sx={{ height: "100vh", py: 2, display: "flex", flexDirection: "column" }}
+      sx={{ height: "100vh", display: "flex", flexDirection: "column" }}
     >
       {/* User Session Header */}
       <Box
@@ -682,8 +682,11 @@ export default function Home() {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          mb: 2,
+          mb: 1,
           px: 2,
+          py: 1,
+          backgroundColor: "#fff",
+          borderBottom: "1px solid #CDCFD0",
         }}
       >
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
@@ -719,15 +722,13 @@ export default function Home() {
           </IconButton>
         </Box>
       </Box>
-
-
-
       <Box
         sx={{
           display: "flex",
           flex: 1,
-          position: "relative",
           overflow: "hidden",
+          flexDirection: "column",
+          alignItems: "center",
         }}
       >
         <Tabs
@@ -735,15 +736,12 @@ export default function Home() {
           onChange={handleDesktopTabChange}
           aria-label="desktop navigation tabs"
           sx={{
-            position: "absolute",
-            top: 90,
-            left: '50%',
-            zIndex: 1000,
             width: { xs: '100%', md: 'auto' },
-            transform: 'translateX(-50%)',
             "& .MuiTabs-indicator": {
               display: "none",
             },
+            pb: 2,
+            px: 2,
           }}
           variant="fullWidth"
         >
@@ -807,6 +805,7 @@ export default function Home() {
             p: 3,
             display: desktopTabValue === 0 ? "flex" : "none",
             flexDirection: "column",
+            width: "100%",
           }}
         >
           {desktopTabValue === 0 && (
@@ -871,6 +870,7 @@ export default function Home() {
             backgroundColor: "#f8f9fa",
             overflow: "hidden",
             display: desktopTabValue === 1 ? "block" : "none",
+            width: "100%",
           }}
         >
           {desktopTabValue === 1 && (
@@ -886,7 +886,6 @@ export default function Home() {
               currentUser={currentUser || undefined}
               timeSlot={bookingsMap[selectedDate || ""]?.timeSlot}
               onToggleDrawer={() => { }}
-              showDrawerToggle={false}
             />
           )}
         </Box>

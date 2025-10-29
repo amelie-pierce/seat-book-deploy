@@ -80,7 +80,6 @@ export default function ReservationForm({
   const [previousUser, setPreviousUser] = useState<string | undefined>(
     currentUser
   );
-  const [manuallyClearedDates, setManuallyClearedDates] = useState<Set<string>>(new Set());
 
   // Suppress unused variable warning - pendingBookings is used through setPendingBookings
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -283,15 +282,6 @@ export default function ReservationForm({
 
   // Handle seat selection from dropdown
   const handleSeatSelectionFromDropdown = (dateStr: string, seatId: string) => {
-    // If user is selecting a seat, remove from manually cleared dates
-    if (seatId && seatId !== "") {
-      setManuallyClearedDates(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(dateStr);
-        return newSet;
-      });
-    }
-    
     const newSelections = {
       ...selectedSeatsFromDropdown,
       [dateStr]: seatId,
@@ -376,7 +366,6 @@ export default function ReservationForm({
     setSelectedZones({});
     setLastSelectedSeat(undefined);
     setPendingBookings({});
-    setManuallyClearedDates(new Set());
     clearAllDropdownSelections();
     setShowSuccess(false);
   }, [clearAllDropdownSelections]);
@@ -715,9 +704,6 @@ export default function ReservationForm({
     console.log(`🧹 Current seat for ${date}:`, getCurrentSeat(date));
     console.log(`🧹 selectedSeatsFromDropdown[${date}]:`, selectedSeatsFromDropdown[date]);
     
-    // Mark this date as manually cleared to prevent auto-fill
-    setManuallyClearedDates(prev => new Set(prev).add(date));
-    
     // Clear seat selection for this date (table and desk will show placeholders)
     updateDropdownSelection(date, "");
     
@@ -820,7 +806,6 @@ export default function ReservationForm({
         // Clear dropdown selections after submission
         clearAllDropdownSelections();
         setPendingBookings({});
-        setManuallyClearedDates(new Set()); // Clear manually cleared dates after booking
 
         // Notify parent about clearing dropdown selections
         if (onDropdownSelectionChange) {
@@ -958,7 +943,7 @@ export default function ReservationForm({
 
   return (
     <>
-      <Container maxWidth="md">
+      <Container maxWidth="lg">
         <Typography
           variant="h5"
           component="h2"
@@ -1064,200 +1049,198 @@ export default function ReservationForm({
                 </Box>
 
                 {/* Booking Details Column */}
-                <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
-                  {/* Zone Selection */}
-                  <Box>
-                    <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500, fontSize: "0.875rem", color: "#6B7280" }}>
-                      Zone
-                    </Typography>
-                    <ToggleButtonGroup
-                      value={getZoneForDate(dateStr)}
-                      exclusive
-                      onChange={(e, newValue) => {
-                        if (newValue !== null && !booking) {
-                          handleZoneChange(dateStr, newValue as "zone1" | "zone2");
-                        }
-                      }}
-                      size="small"
+                {/* Zone Selection */}
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500, fontSize: "0.875rem", color: "#6B7280" }}>
+                    Zone
+                  </Typography>
+                  <ToggleButtonGroup
+                    value={getZoneForDate(dateStr)}
+                    exclusive
+                    onChange={(e, newValue) => {
+                      if (newValue !== null && !booking) {
+                        handleZoneChange(dateStr, newValue as "zone1" | "zone2");
+                      }
+                    }}
+                    size="small"
+                    sx={{
+                      width: "100%",
+                      "& .MuiToggleButtonGroup-grouped": {
+                        border: "1px solid #E5E7EB",
+                        "&:not(:first-of-type)": {
+                          borderLeft: "1px solid #E5E7EB",
+                        },
+                      },
+                    }}
+                    disabled={!!booking || isPastDate}
+                  >
+                    <ToggleButton
+                      value="zone1"
                       sx={{
-                        width: "100%",
-                        "& .MuiToggleButtonGroup-grouped": {
-                          border: "1px solid #E5E7EB",
-                          "&:not(:first-of-type)": {
-                            borderLeft: "1px solid #E5E7EB",
+                        flex: 1,
+                        textTransform: "none",
+                        fontWeight: 600,
+                        color: "#6B7280",
+                        backgroundColor: "#FFFFFF",
+                        border: "1px solid #E5E7EB",
+                        "&.Mui-selected": {
+                          backgroundColor: "#FFE5D9",
+                          color: "#FF5208",
+                          border: "1px solid #FFE5D9",
+                          "&:hover": {
+                            backgroundColor: "#FFD4C2",
                           },
                         },
+                        "&:hover": {
+                          backgroundColor: "#F9FAFB",
+                        },
                       }}
-                      disabled={!!booking || isPastDate}
                     >
-                      <ToggleButton
-                        value="zone1"
-                        sx={{
-                          flex: 1,
-                          textTransform: "none",
-                          fontWeight: 600,
-                          color: "#6B7280",
-                          backgroundColor: "#FFFFFF",
-                          border: "1px solid #E5E7EB",
-                          "&.Mui-selected": {
-                            backgroundColor: "#FFE5D9",
-                            color: "#FF5208",
-                            border: "1px solid #FFE5D9",
-                            "&:hover": {
-                              backgroundColor: "#FFD4C2",
-                            },
-                          },
+                      Zone A
+                    </ToggleButton>
+                    <ToggleButton
+                      value="zone2"
+                      sx={{
+                        flex: 1,
+                        textTransform: "none",
+                        fontWeight: 600,
+                        color: "#6B7280",
+                        backgroundColor: "#FFFFFF",
+                        border: "1px solid #E5E7EB",
+                        "&.Mui-selected": {
+                          backgroundColor: "#FFE5D9",
+                          color: "#FF5208",
+                          border: "1px solid #FFE5D9",
                           "&:hover": {
-                            backgroundColor: "#F9FAFB",
+                            backgroundColor: "#FFD4C2",
                           },
-                        }}
-                      >
-                        Zone A
-                      </ToggleButton>
-                      <ToggleButton
-                        value="zone2"
-                        sx={{
-                          flex: 1,
-                          textTransform: "none",
-                          fontWeight: 600,
-                          color: "#6B7280",
-                          backgroundColor: "#FFFFFF",
-                          border: "1px solid #E5E7EB",
-                          "&.Mui-selected": {
-                            backgroundColor: "#FFE5D9",
-                            color: "#FF5208",
-                            border: "1px solid #FFE5D9",
-                            "&:hover": {
-                              backgroundColor: "#FFD4C2",
-                            },
-                          },
-                          "&:hover": {
-                            backgroundColor: "#F9FAFB",
-                          },
-                        }}
-                      >
-                        Zone B
-                      </ToggleButton>
-                    </ToggleButtonGroup>
-                  </Box>
+                        },
+                        "&:hover": {
+                          backgroundColor: "#F9FAFB",
+                        },
+                      }}
+                    >
+                      Zone B
+                    </ToggleButton>
+                  </ToggleButtonGroup>
+                </Box>
 
-                  {/* Time Slot Selection */}
-                  <Box>
-                    <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500, fontSize: "0.875rem", color: "#6B7280" }}>
-                      Time Slot
-                    </Typography>
-                    <ToggleButtonGroup
-                      value={getTimeSlotForDate(dateStr) || ""}
-                      exclusive
-                      onChange={(e, newValue) => {
-                        if (newValue !== null) {
-                          handleTimeSlotChange(dateStr, newValue as TimeSlotType);
-                        }
-                      }}
-                      size="small"
+                {/* Time Slot Selection */}
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500, fontSize: "0.875rem", color: "#6B7280" }}>
+                    Time Slot
+                  </Typography>
+                  <ToggleButtonGroup
+                    value={getTimeSlotForDate(dateStr) || ""}
+                    exclusive
+                    onChange={(e, newValue) => {
+                      if (newValue !== null) {
+                        handleTimeSlotChange(dateStr, newValue as TimeSlotType);
+                      }
+                    }}
+                    size="small"
+                    sx={{
+                      textWrap: 'nowrap',
+                      width: "100%",
+                      "& .MuiToggleButtonGroup-grouped": {
+                        border: "1px solid #E5E7EB",
+                        "&:not(:first-of-type)": {
+                          borderLeft: "1px solid #E5E7EB",
+                        },
+                      },
+                    }}
+                    disabled={!!booking}
+                  >
+                    <ToggleButton
+                      value="FULL_DAY"
                       sx={{
-                        width: "100%",
-                        "& .MuiToggleButtonGroup-grouped": {
-                          border: "1px solid #E5E7EB",
-                          "&:not(:first-of-type)": {
-                            borderLeft: "1px solid #E5E7EB",
+                        flex: 1,
+                        textTransform: "none",
+                        fontWeight: 600,
+                        color: "#6B7280",
+                        backgroundColor: "#FFFFFF",
+                        border: "1px solid #E5E7EB",
+                        "&.Mui-selected": {
+                          backgroundColor: "#FFE5D9",
+                          color: "#FF5208",
+                          border: "1px solid #FFE5D9",
+                          "&:hover": {
+                            backgroundColor: "#FFD4C2",
                           },
                         },
+                        "&:hover": {
+                          backgroundColor: "#F9FAFB",
+                        },
                       }}
-                      disabled={!!booking}
                     >
-                      <ToggleButton
-                        value="FULL_DAY"
-                        sx={{
-                          flex: 1,
-                          textTransform: "none",
-                          fontWeight: 600,
-                          color: "#6B7280",
-                          backgroundColor: "#FFFFFF",
-                          border: "1px solid #E5E7EB",
-                          "&.Mui-selected": {
-                            backgroundColor: "#FFE5D9",
-                            color: "#FF5208",
-                            border: "1px solid #FFE5D9",
-                            "&:hover": {
-                              backgroundColor: "#FFD4C2",
-                            },
-                          },
+                      Full Day
+                    </ToggleButton>
+                    <ToggleButton
+                      value="AM"
+                      sx={{
+                        flex: 1,
+                        textTransform: "none",
+                        fontWeight: 600,
+                        color: "#6B7280",
+                        backgroundColor: "#FFFFFF",
+                        border: "1px solid #E5E7EB",
+                        "&.Mui-selected": {
+                          backgroundColor: "#FFE5D9",
+                          color: "#FF5208",
+                          border: "1px solid #FFE5D9",
                           "&:hover": {
-                            backgroundColor: "#F9FAFB",
+                            backgroundColor: "#FFD4C2",
                           },
-                        }}
-                      >
-                        Full Day
-                      </ToggleButton>
-                      <ToggleButton
-                        value="AM"
-                        sx={{
-                          flex: 1,
-                          textTransform: "none",
-                          fontWeight: 600,
-                          color: "#6B7280",
-                          backgroundColor: "#FFFFFF",
-                          border: "1px solid #E5E7EB",
-                          "&.Mui-selected": {
-                            backgroundColor: "#FFE5D9",
-                            color: "#FF5208",
-                            border: "1px solid #FFE5D9",
-                            "&:hover": {
-                              backgroundColor: "#FFD4C2",
-                            },
-                          },
+                        },
+                        "&:hover": {
+                          backgroundColor: "#F9FAFB",
+                        },
+                      }}
+                    >
+                      AM
+                    </ToggleButton>
+                    <ToggleButton
+                      value="PM"
+                      sx={{
+                        flex: 1,
+                        textTransform: "none",
+                        fontWeight: 600,
+                        color: "#6B7280",
+                        backgroundColor: "#FFFFFF",
+                        border: "1px solid #E5E7EB",
+                        "&.Mui-selected": {
+                          backgroundColor: "#FFE5D9",
+                          color: "#FF5208",
+                          border: "1px solid #FFE5D9",
                           "&:hover": {
-                            backgroundColor: "#F9FAFB",
+                            backgroundColor: "#FFD4C2",
                           },
-                        }}
-                      >
-                        AM
-                      </ToggleButton>
-                      <ToggleButton
-                        value="PM"
-                        sx={{
-                          flex: 1,
-                          textTransform: "none",
-                          fontWeight: 600,
-                          color: "#6B7280",
-                          backgroundColor: "#FFFFFF",
-                          border: "1px solid #E5E7EB",
-                          "&.Mui-selected": {
-                            backgroundColor: "#FFE5D9",
-                            color: "#FF5208",
-                            border: "1px solid #FFE5D9",
-                            "&:hover": {
-                              backgroundColor: "#FFD4C2",
-                            },
-                          },
-                          "&:hover": {
-                            backgroundColor: "#F9FAFB",
-                          },
-                        }}
-                      >
-                        PM
-                      </ToggleButton>
-                    </ToggleButtonGroup>
-                  </Box>
+                        },
+                        "&:hover": {
+                          backgroundColor: "#F9FAFB",
+                        },
+                      }}
+                    >
+                      PM
+                    </ToggleButton>
+                  </ToggleButtonGroup>
                 </Box>
                 {/* Table and Desk Selection Row */}
-                <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
-                  {/* Table Selection */}
-                  <Box>
-                    <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500, fontSize: "0.875rem", color: "#6B7280" }}>
-                      Select Table
-                    </Typography>
-                    <FormControl size="small" fullWidth>
-                      <Select
-                        value={getCurrentSeat(dateStr) ? getCurrentSeat(dateStr).charAt(0) : ""}
-                        onChange={(e) => {
-                          // When table changes, set a temporary table selection
-                          const table = e.target.value as string;
-                          if (table) {
-                            // Keep existing seat number if same table, otherwise set table with "0" as placeholder
-                            const currentSeat = getCurrentSeat(dateStr);
-                            const currentTable = currentSeat ? currentSeat.charAt(0) : "";
+                {/* Table Selection */}
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500, fontSize: "0.875rem", color: "#6B7280" }}>
+                    Select Table
+                  </Typography>
+                  <FormControl size="small" fullWidth>
+                    <Select
+                      value={getCurrentSeat(dateStr) ? getCurrentSeat(dateStr).charAt(0) : ""}
+                      onChange={(e) => {
+                        // When table changes, clear the desk selection
+                        const table = e.target.value as string;
+                        if (table) {
+                          // Keep existing seat number if same table, otherwise reset
+                          const currentSeat = getCurrentSeat(dateStr);
+                          const currentTable = currentSeat ? currentSeat.charAt(0) : "";
 
                             if (table === currentTable && currentSeat) {
                               // Same table, keep the desk
@@ -1301,14 +1284,14 @@ export default function ReservationForm({
                     </FormControl>
                   </Box>
 
-                  {/* Desk Selection */}
-                  <Box>
-                    <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500, fontSize: "0.875rem", color: "#6B7280" }}>
-                      Select Desk
-                    </Typography>
-                    <FormControl size="small" fullWidth>
-                      <Select
-                        value={(() => {
+                {/* Desk Selection */}
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500, fontSize: "0.875rem", color: "#6B7280" }}>
+                    Select Desk
+                  </Typography>
+                  <FormControl size="small" fullWidth>
+                    <Select
+                      value={(() => {
                           const seat = getCurrentSeat(dateStr);
                           // If seat ends with "0", it's a placeholder, show empty
                           if (seat && seat.endsWith("0")) {
@@ -1316,39 +1299,39 @@ export default function ReservationForm({
                           }
                           return seat;
                         })()}
-                        onChange={(e) =>
-                          handleSeatSelectionFromDropdown(
-                            dateStr,
-                            e.target.value as string
-                          )
-                        }
-                        displayEmpty
-                        sx={{
-                          borderRadius: 1,
-                          backgroundColor: "#FFFFFF",
-                          "& .MuiOutlinedInput-notchedOutline": {
-                            borderColor: "#E5E7EB",
-                          },
-                        }}
-                        disabled={
+                      onChange={(e) =>
+                        handleSeatSelectionFromDropdown(
+                          dateStr,
+                          e.target.value as string
+                        )
+                      }
+                      displayEmpty
+                      sx={{
+                        borderRadius: 1,
+                        backgroundColor: "#FFFFFF",
+                        "& .MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#E5E7EB",
+                        },
+                      }}
+                      disabled={
                           !!booking || 
                           isPastDate || 
                           !selectedTimeSlots[dateStr] || 
                           !(getCurrentSeat(dateStr) ? getCurrentSeat(dateStr).charAt(0) : "")
                         }
-                      >
-                        <MenuItem value="">
-                          <em>Desk No.</em>
-                        </MenuItem>
-                        {(() => {
-                          // If there's an existing booking, show only that seat
-                          if (booking) {
-                            return (
-                              <MenuItem key={booking.seatId} value={booking.seatId}>
-                                Desk No.{booking.seatId.slice(1)}
-                              </MenuItem>
-                            );
-                          }
+                    >
+                      <MenuItem value="">
+                        <em>Desk No.</em>
+                      </MenuItem>
+                      {(() => {
+                        // If there's an existing booking, show only that seat
+                        if (booking) {
+                          return (
+                            <MenuItem key={booking.seatId} value={booking.seatId}>
+                              Desk No.{booking.seatId.slice(1)}
+                            </MenuItem>
+                          );
+                        }
 
                           if (!selectedTimeSlots[dateStr]) {
                             return null; // No seats shown until time slot is selected
@@ -1363,13 +1346,33 @@ export default function ReservationForm({
                             currentZone
                           );
 
-                          // Get the selected table
-                          const currentSeat = getCurrentSeat(dateStr);
-                          const selectedTable = currentSeat ? currentSeat.charAt(0) : "";
+                        // Get the selected table
+                        const currentSeat = getCurrentSeat(dateStr);
+                        const selectedTable = currentSeat ? currentSeat.charAt(0) : "";
 
-                          // If a table is selected, only show seats from that table
-                          if (selectedTable && groupedSeats[selectedTable]) {
-                            return groupedSeats[selectedTable]
+                        // If a table is selected, only show seats from that table
+                        if (selectedTable && groupedSeats[selectedTable]) {
+                          return groupedSeats[selectedTable]
+                            .sort((a, b) => {
+                              const numA = parseInt(a.slice(1));
+                              const numB = parseInt(b.slice(1));
+                              return numA - numB;
+                            })
+                            .map((seatId) => (
+                              <MenuItem key={seatId} value={seatId}>
+                                Desk No.{seatId.slice(1)}
+                              </MenuItem>
+                            ));
+                        }
+
+                        // Otherwise show all available seats grouped by table (filtered by zone)
+                        return Object.keys(groupedSeats)
+                          .sort()
+                          .map((tableLetter) => [
+                            <ListSubheader key={`header-${tableLetter}`}>
+                              Table {tableLetter}
+                            </ListSubheader>,
+                            ...groupedSeats[tableLetter]
                               .sort((a, b) => {
                                 const numA = parseInt(a.slice(1));
                                 const numB = parseInt(b.slice(1));
@@ -1379,63 +1382,20 @@ export default function ReservationForm({
                                 <MenuItem key={seatId} value={seatId}>
                                   Desk No.{seatId.slice(1)}
                                 </MenuItem>
-                              ));
-                          }
-
-                          // Otherwise show all available seats grouped by table (filtered by zone)
-                          return Object.keys(groupedSeats)
-                            .sort()
-                            .map((tableLetter) => [
-                              <ListSubheader key={`header-${tableLetter}`}>
-                                Table {tableLetter}
-                              </ListSubheader>,
-                              ...groupedSeats[tableLetter]
-                                .sort((a, b) => {
-                                  const numA = parseInt(a.slice(1));
-                                  const numB = parseInt(b.slice(1));
-                                  return numA - numB;
-                                })
-                                .map((seatId) => (
-                                  <MenuItem key={seatId} value={seatId}>
-                                    Desk No.{seatId.slice(1)}
-                                  </MenuItem>
-                                )),
-                            ])
-                            .flat();
-                        })()}
-                      </Select>
-                    </FormControl>
-                  </Box>
+                              )),
+                          ])
+                          .flat();
+                      })()}
+                    </Select>
+                  </FormControl>
                 </Box>
 
                 {/* Clear and Remove Buttons */}
-                <Box sx={{ display: "flex", flexDirection: "column", gap: 1, alignItems: "center" }}>
-                  {/* Clear Button */}
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    sx={{
-                      color: "#6B7280",
-                      borderColor: "#E5E7EB",
-                      textTransform: "none",
-                      fontWeight: 600,
-                      minWidth: 80,
-                      height: "fit-content",
-                      "&:hover": {
-                        borderColor: "#9CA3AF",
-                        backgroundColor: "#F9FAFB",
-                      },
-                    }}
-                    onClick={() => handleClearDate(dateStr)}
-                    disabled={isPastDate || (!selectedSeatsFromDropdown[dateStr] && !selectedSeatsFromClick[dateStr] && !(selectedDate === dateStr && selectedSeat))}
-                  >
-                    Clear
-                  </Button>
-
+                <Box>
                   {/* Remove Button */}
+                  <p>&nbsp;</p>
                   <Button
                     variant="outlined"
-                    size="small"
                     sx={{
                       color: "#FF5208",
                       borderColor: "#FF5208",
