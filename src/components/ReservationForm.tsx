@@ -64,6 +64,7 @@ export default function ReservationForm({
   };
 
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showRemoveSuccess, setShowRemoveSuccess] = useState(false);
   const [selectedTimeSlots, setSelectedTimeSlots] = useState<{
     [date: string]: TimeSlotType;
   }>({});
@@ -1472,6 +1473,7 @@ export default function ReservationForm({
                         });
                         if (onBookingChange) await onBookingChange();
                         handleClear(); // Clear the time slot selection
+                        setShowRemoveSuccess(true); // Show success toast
                       } catch (err) {
                         console.error("Failed to cancel booking:", err);
                       }
@@ -1524,9 +1526,17 @@ export default function ReservationForm({
         onClose={() => setShowSuccess(false)}
       >
         <Alert severity="success" onClose={() => setShowSuccess(false)}>
-          {totalBookings === 1
-            ? "Reservation submitted successfully!"
-            : `${totalBookings} reservations submitted successfully!`}
+          Reservation(s) submitted successfully
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={showRemoveSuccess}
+        autoHideDuration={4000}
+        onClose={() => setShowRemoveSuccess(false)}
+      >
+        <Alert severity="success" onClose={() => setShowRemoveSuccess(false)}>
+          Booking removed successfully!
         </Alert>
       </Snackbar>
     </>
