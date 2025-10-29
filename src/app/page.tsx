@@ -700,7 +700,7 @@ export default function Home() {
           aria-label="desktop navigation tabs"
           sx={{
             position: "absolute",
-            top: 0,
+            top: 90,
             left: '50%',
             zIndex: 1000,
             width: { xs: '100%', md: 'auto' },
