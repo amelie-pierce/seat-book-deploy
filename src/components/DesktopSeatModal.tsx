@@ -195,9 +195,9 @@ export default function DesktopSeatModal({
           // Show all bookings for this seat
           <>
             <Box sx={{ borderTop: 1, borderColor: 'grey.300', pt: 2, mb: 3 }}>
-              <Typography variant="body2" sx={{ mb: 2, fontWeight: 600 }}>
+              <Box sx={{ mb: 2, fontWeight: 600, fontSize: '1rem', color: 'text.secondary' }}>
                 Current Bookings:
-              </Typography>
+              </Box>
               
               {seatBookings.map((booking, index) => (
                 <Box 
@@ -224,7 +224,7 @@ export default function DesktopSeatModal({
                     {booking.userId.charAt(0)}
                   </Avatar>
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2" fontWeight="bold">
+                    <Box sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary', display: 'inline-flex', alignItems: 'center' }}>
                       {booking.userId}
                       {booking.userId === currentUser && (
                         <Chip 
@@ -234,10 +234,10 @@ export default function DesktopSeatModal({
                           sx={{ ml: 1, height: 20, fontSize: '0.7rem' }}
                         />
                       )}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
+                    </Box>
+                    <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
                       {getTimeSlotLabel(booking.timeSlot)}
-                    </Typography>
+                    </Box>
                   </Box>
                 </Box>
               ))}

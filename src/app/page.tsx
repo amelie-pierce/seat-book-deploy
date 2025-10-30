@@ -23,26 +23,49 @@ import SeatModal from "../components/SeatModal";
 import { useUserSession } from "../hooks/useUserSession";
 import { SEATING_CONFIG, generateAllSeats } from "../config/seatingConfig";
 import { bookingService } from "../services/bookingService";
-import { vercelDataService } from "../services/vercelDataService";
 import { BookingRecord } from "../utils/bookingStorage";
 import { useEffect } from "react";
+import { supabase } from "../../utils/supabase";
 
 const userAvatar = {
-  1234: 'https://i.pravatar.cc/150?img=1',
-  "U001": 'https://i.pravatar.cc/150?img=2',
-  "U002": 'https://i.pravatar.cc/150?img=3',
-  "U003": 'https://i.pravatar.cc/150?img=4',
-  "U004": 'https://i.pravatar.cc/150?img=5',
-}
+  1234: "https://i.pravatar.cc/150?img=1",
+  U001: "https://i.pravatar.cc/150?img=2",
+  U002: "https://i.pravatar.cc/150?img=3",
+  U003: "https://i.pravatar.cc/150?img=4",
+  U004: "https://i.pravatar.cc/150?img=5",
+};
 
 export default function Home() {
   // Helper function to convert local date to YYYY-MM-DD string without timezone issues
   const formatLocalDate = (date: Date): string => {
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
   };
+
+  const getReservationsData = async () => {
+    const { data, error } = await supabase.from("reservations").select("*");
+    console.log('data', data );
+    // Optionally handle error
+    if (error) {
+      console.error('Supabase error:', error);
+    }
+  };
+
+  const getUsersData = async () => {
+    const { data, error } = await supabase.from("users").select("*");
+    console.log('data', data );
+    // Optionally handle error
+    if (error) {
+      console.error('Supabase error:', error);
+    }
+  };
+
+  useEffect(() => {
+    getReservationsData();
+    getUsersData();
+  }, []);
 
   const todayDate = formatLocalDate(new Date());
 
@@ -101,6 +124,7 @@ export default function Home() {
     [date: string]: string;
   }>({});
   const [bookingError, setBookingError] = useState<string | null>(null);
+  const [bookingErrorSeverity, setBookingErrorSeverity] = useState<"success" | "error">("error");
   const [userBookings, setUserBookings] = useState<BookingRecord[]>([]);
   const [userEmail, setUserEmail] = useState<string>("");
   const [bookingsMap, setBookingsMap] = useState<{
@@ -129,7 +153,10 @@ export default function Home() {
   const [mobileSeatModalSeatId, setMobileSeatModalSeatId] =
     useState<string>("");
   const [mobileSeatModalDate, setMobileSeatModalDate] = useState<string>("");
-  const [modalAnchorPosition, setModalAnchorPosition] = useState<{ top: number; left: number } | null>(null);
+  const [modalAnchorPosition, setModalAnchorPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
 
   // Memoize filtered userBookings to prevent infinite loops in ReservationForm
   const activeUserBookings = useMemo(() => {
@@ -153,17 +180,10 @@ export default function Home() {
 
   // Initialize database and load user data when app opens
   useEffect(() => {
-    const initializeApp = async () => {
+    const loadBookingsForToday = async () => {
       try {
         setIsLoadingBookings(true);
-
-        // Initialize the CSV database
-        await bookingService.initializeDatabase();
-
-        // Load all bookings for today
         const allBookings = await bookingService.getBookingsForDate(todayDate);
-
-        // Transform bookings to the format expected by Table component
         const bookedSeatsData = allBookings.map((booking) => ({
           seatId: booking.seatId,
           userId: booking.userId,
@@ -171,24 +191,13 @@ export default function Home() {
         }));
         setAllBookingsForDate(bookedSeatsData);
       } catch (error) {
-        console.error("❌ Error initializing app:", error);
-
-        // Check if this is a CSV loading error that should redirect to 404
-        if (
-          error instanceof Error &&
-          error.message.includes("Required CSV files could not be loaded")
-        ) {
-          // The CSV service will handle the redirect
-          return;
-        }
-
+        console.error("❌ Error loading bookings:", error);
         setBookingError("Failed to load booking data");
       } finally {
         setIsLoadingBookings(false);
       }
     };
-
-    initializeApp();
+    loadBookingsForToday();
   }, [todayDate]);
 
   // Load user-specific data when user logs in (not when date changes)
@@ -197,53 +206,29 @@ export default function Home() {
       if (currentUser) {
         try {
           console.log(`👤 Loading data for user: ${currentUser}`);
-
-          // Don't refresh if we just initialized - data is already fresh
-          // Only refresh if this is a re-login or explicit user change
-          const cacheInfo = bookingService.getCacheInfo();
-          if (!cacheInfo.isInitialized) {
-            await bookingService.refreshFromCsv();
-          }
-
-          // Fetch user email
-          try {
-            const userInfo = await vercelDataService.getUserById(currentUser);
-            if (userInfo && userInfo.email) {
-              setUserEmail(userInfo.email);
-            }
-          } catch (error) {
-            console.error("Error fetching user email:", error);
-            setUserEmail(""); // Fallback to empty string
-          }
-
-          const userData = await bookingService.loadUserData(currentUser);
-          setUserBookings(userData.userBookings);
-
+          // Fetch user bookings from Supabase
+          const bookings = await bookingService.getUserBookings(currentUser);
+          setUserBookings(bookings);
           // Create a map of bookings by date
-          const bookings = userData.userBookings.reduce((acc, booking) => {
-            acc[booking.date] = {
+          const bookingsMapObj: { [key: string]: { seatId: string; timeSlot: "AM" | "PM" | "FULL_DAY" } } = {};
+          bookings.forEach((booking) => {
+            bookingsMapObj[booking.date] = {
               seatId: booking.seatId,
               timeSlot: booking.timeSlot,
             };
-            return acc;
-          }, {} as { [key: string]: { seatId: string; timeSlot: "AM" | "PM" | "FULL_DAY" } });
-          setBookingsMap(bookings);
-
-          // Note: Date-specific data loading is handled by handleDateClick and other date change events
-          // We don't need to load it here during user login to avoid redundant API calls
+          });
+          setBookingsMap(bookingsMapObj);
         } catch (error) {
           console.error("❌ Error loading user data:", error);
         }
       } else {
-        // Clear user-specific data when user logs out
         setUserBookings([]);
         setSelectedSeat(null);
-        setUserEmail(""); // Clear email when user logs out
+        setUserEmail("");
       }
     };
-
     loadUserData();
-  }, [currentUser]); // Removed selectedDate to prevent unnecessary refreshes
+  }, [currentUser]);
 
   // Handle initial date load and pending seat selection
   useEffect(() => {
@@ -279,7 +264,10 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser]);
 
-  const handleSeatClick = (seatId: string, event?: React.MouseEvent<HTMLButtonElement>) => {
+  const handleSeatClick = (
+    seatId: string,
+    event?: React.MouseEvent<HTMLButtonElement>
+  ) => {
     // Check seat availability using the new logic
     const isSeatClickable = () => {
       // Find all bookings for this seat on the selected date
@@ -304,7 +292,8 @@ export default function Home() {
 
       // Check for FULL_DAY bookings by other users
       const hasFullDayBooking = seatBookings.some(
-        (booking) => booking.timeSlot === "FULL_DAY" && booking.userId !== currentUser
+        (booking) =>
+          booking.timeSlot === "FULL_DAY" && booking.userId !== currentUser
       );
       if (hasFullDayBooking) {
         return false;
@@ -318,10 +307,13 @@ export default function Home() {
         (booking) => booking.timeSlot === "PM"
       );
 
-      if (amBooking && pmBooking &&
+      if (
+        amBooking &&
+        pmBooking &&
         amBooking.userId !== currentUser &&
         pmBooking.userId !== currentUser &&
-        amBooking.userId !== pmBooking.userId) {
+        amBooking.userId !== pmBooking.userId
+      ) {
         // Both AM and PM booked by different users (not current user) - not available
         return false;
       }
@@ -333,7 +325,7 @@ export default function Home() {
     if (isSeatClickable()) {
       // Open the seat selection modal for both mobile and desktop
       if (selectedDate) {
-        console.log("selectedDate", selectedDate)
+        console.log("selectedDate", selectedDate);
         // Calculate position for desktop modal
         if (event) {
           const buttonRect = event.currentTarget.getBoundingClientRect();
@@ -419,7 +411,6 @@ export default function Home() {
     timeSlot: "AM" | "PM" | "FULL_DAY"
   ) => {
     if (!mobileSeatModalDate || !currentUser) return;
-
     try {
       // Find the booking to remove
       const bookingToRemove = userBookings.find(
@@ -429,21 +420,23 @@ export default function Home() {
           booking.timeSlot === timeSlot &&
           booking.status === "ACTIVE"
       );
-
       if (bookingToRemove) {
-        // Use the booking service to cancel the booking
-        await bookingService.cancelBooking(bookingToRemove.id, currentUser);
-
-        // Refresh user bookings
-        const userData = await bookingService.loadUserData(currentUser);
-        setUserBookings(userData.userBookings);
-
-        // Refresh the current date view
-        if (selectedDate) {
-          await handleDateClick(selectedDate);
+        const result = await bookingService.cancelBooking(bookingToRemove.id);
+        if (result.success) {
+          setBookingError("Reservation deleted successfully");
+          setBookingErrorSeverity("success");
+          // Refresh user bookings
+          const bookings = await bookingService.getUserBookings(currentUser);
+          setUserBookings(bookings);
+          // Refresh the current date view
+          if (selectedDate) {
+            await handleDateClick(selectedDate);
+          }
+        } else {
+          setBookingError(result.error || "Failed to remove reservation. Please try again.");
+          setBookingErrorSeverity("error");
         }
       }
-
       handleMobileSeatModalClose();
     } catch (error) {
       console.error("Failed to remove reservation:", error);
@@ -452,24 +445,15 @@ export default function Home() {
   };
 
   const handleLogout = async () => {
-    // Clear all state before logout
     setSelectedSeat(null);
     setSelectedSeatsFromClick({});
     setSelectedSeatsFromDropdown({});
     setUserBookings([]);
     setBookingsMap({});
-
     clearUserSession();
-
-    // Refresh booking data to show clean state for next user
-    try {
-      await bookingService.refreshFromCsv();
-      // Reload bookings for current date
-      if (selectedDate) {
-        await handleDateClick(selectedDate);
-      }
-    } catch (error) {
-      console.error("Error refreshing data after logout:", error);
+    // Optionally reload bookings for current date
+    if (selectedDate) {
+      await handleDateClick(selectedDate);
     }
   };
 
@@ -487,67 +471,37 @@ export default function Home() {
       timeSlot: "AM" | "PM" | "FULL_DAY";
     }>
   ) => {
-    if (bookings.length > 0) {
+    if (bookings.length > 0 && currentUser) {
       try {
         setBookingError(null);
-
-        const result = await bookingService.createMultipleBookings(
-          currentUser!,
-          bookings
+        // Only support single booking creation for now
+        const booking = bookings[0];
+        const result = await bookingService.createBooking(
+          currentUser,
+          booking.seatId,
+          booking.timeSlot,
+          booking.date
         );
-
         if (result.success) {
-          console.log(
-            `✅ ${result.bookings?.length || 0} bookings created successfully`
-          );
-
-          if (result.failedBookings && result.failedBookings.length > 0) {
-            // Check if any failures were due to conflicts
-            const hasConflicts = result.failedBookings.some((msg) =>
-              msg.includes("Already booked")
-            );
-            const errorMessage = hasConflicts
-              ? `⚠️ Some seats were taken by other users: ${result.error}`
-              : `Some bookings failed: ${result.error}`;
-            setBookingError(errorMessage);
-          }
-
-          // Reload user bookings FIRST
-          const userData = await bookingService.loadUserData(currentUser!);
-          setUserBookings(userData.userBookings);
-
-          // Refresh the current date view to update allBookingsForDate
+          setBookingError("Reservation(s) submitted successfully");
+          setBookingErrorSeverity("success");
+          // Reload user bookings
+          const userBookings = await bookingService.getUserBookings(currentUser);
+          setUserBookings(userBookings);
+          // Refresh the current date view
           if (selectedDate) {
             await handleDateClick(selectedDate);
           }
-
-          // Clear selections - the ReservationForm should now have updated userBookings
           setSelectedSeat(null);
           setSelectedSeatsFromClick({});
           setSelectedSeatsFromDropdown({});
-
-          console.log("✅ Bookings created and state refreshed");
         } else {
-          // Check if error indicates conflicts and refresh data
-          const isConflictError =
-            result.error?.includes("already taken") ||
-            result.error?.includes("Already booked");
-          if (isConflictError) {
-            // Force refresh to show updated seat availability
-            await bookingService.refreshAfterConflict();
-            if (selectedDate) {
-              await handleDateClick(selectedDate);
-            }
-            setBookingError(
-              `${result.error} Data refreshed - please try again with available seats.`
-            );
-          } else {
-            setBookingError(result.error || "Failed to create bookings");
-          }
+          setBookingError(result.error || "Failed to create booking");
+          setBookingErrorSeverity("error");
         }
       } catch (error) {
-        console.error("❌ Error creating bookings:", error);
-        setBookingError("Failed to create bookings. Please try again.");
+        console.error("❌ Error creating booking:", error);
+        setBookingError("Failed to create booking. Please try again.");
       }
     }
   };
@@ -697,7 +651,12 @@ export default function Home() {
 
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <Box
-            sx={{ display: "flex", alignItems: "center", gap: 1, fontWeight: 500 }}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              fontWeight: 500,
+            }}
           >
             <Avatar
               src={userAvatar[currentUser as keyof typeof userAvatar]}
@@ -708,16 +667,14 @@ export default function Home() {
             >
               {currentUser?.charAt(0)}
             </Avatar>
-            <Box sx={{ fontSize: '0.9rem' }}>
+            <Box sx={{ fontSize: "0.9rem" }}>
               <p>{currentUser}</p>
-              <Typography sx={{ fontStyle: 'italic', fontSize: '0.75rem' }}>
-                {userEmail || 'No email available'}
+              <Typography sx={{ fontStyle: "italic", fontSize: "0.75rem" }}>
+                {userEmail || "No email available"}
               </Typography>
             </Box>
           </Box>
-          <IconButton
-            onClick={handleLogout}
-          >
+          <IconButton onClick={handleLogout}>
             <LogoutIcon />
           </IconButton>
         </Box>
@@ -736,7 +693,7 @@ export default function Home() {
           onChange={handleDesktopTabChange}
           aria-label="desktop navigation tabs"
           sx={{
-            width: { xs: '100%', md: 'auto' },
+            width: { xs: "100%", md: "auto" },
             "& .MuiTabs-indicator": {
               display: "none",
             },
@@ -760,9 +717,9 @@ export default function Home() {
               borderRadius: "8px 0 0 8px",
               px: 3,
               py: 1,
-              whiteSpace: 'nowrap',
+              whiteSpace: "nowrap",
               "&.Mui-selected": {
-                color: '#FFFFFF',
+                color: "#FFFFFF",
               },
               "& .MuiTab-iconWrapper": {
                 marginRight: 1,
@@ -784,9 +741,9 @@ export default function Home() {
               borderRadius: "0 8px 8px 0",
               px: 3,
               py: 1,
-              whiteSpace: 'nowrap',
+              whiteSpace: "nowrap",
               "&.Mui-selected": {
-                color: '#FFFFFF',
+                color: "#FFFFFF",
               },
               "& .MuiTab-iconWrapper": {
                 marginRight: 1,
@@ -836,10 +793,8 @@ export default function Home() {
                 setAllBookingsForDate(bookedSeatsData);
 
                 // Refresh user bookings
-                const userData = await bookingService.loadUserData(
-                  currentUser!
-                );
-                setUserBookings(userData.userBookings);
+                const userBookingsData = await bookingService.getUserBookings(currentUser!);
+                setUserBookings(userBookingsData);
                 // Refresh available seats for the selected date
                 if (selectedDate) {
                   const reservedSeats = allBookings.map((b) => b.seatId);
@@ -848,13 +803,17 @@ export default function Home() {
                   );
                   setAvailableSeatsForDate(seats);
                   // If the selected seat was just deleted, clear it
-                  const stillBooked = userData.userBookings.find(
+                  const stillBooked = userBookingsData.find(
                     (b) => b.date === selectedDate && b.seatId === selectedSeat
                   );
                   if (!stillBooked) {
                     setSelectedSeat(null);
                   }
                 }
+              }}
+              onShowToast={(message, severity = "success") => {
+                setBookingError(message);
+                setBookingErrorSeverity(severity);
               }}
             />
           )}
@@ -885,7 +844,7 @@ export default function Home() {
               bookedSeats={allBookingsForDate}
               currentUser={currentUser || undefined}
               timeSlot={bookingsMap[selectedDate || ""]?.timeSlot}
-              onToggleDrawer={() => { }}
+              onToggleDrawer={() => {}}
             />
           )}
         </Box>
@@ -909,7 +868,7 @@ export default function Home() {
         autoHideDuration={6000}
         onClose={() => setBookingError(null)}
       >
-        <Alert severity="error" onClose={() => setBookingError(null)}>
+        <Alert severity={bookingErrorSeverity} onClose={() => setBookingError(null)}>
           {bookingError}
         </Alert>
       </Snackbar>

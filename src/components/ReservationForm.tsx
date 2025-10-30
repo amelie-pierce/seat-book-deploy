@@ -19,6 +19,7 @@ import {
 type TimeSlotType = "AM" | "PM" | "FULL_DAY";
 
 interface ReservationFormProps {
+  onShowToast?: (message: string, severity?: "success" | "error") => void;
   selectedSeat?: string;
   selectedSeatsFromClick?: { [date: string]: string };
   selectedSeatsFromDropdown?: { [date: string]: string };
@@ -54,6 +55,7 @@ export default function ReservationForm({
   onDropdownSelectionChange,
   onClearClickSelection,
   allBookingsForDate = [],
+  onShowToast,
 }: ReservationFormProps) {
   // Helper function to format date without timezone issues
   const formatLocalDate = (date: Date): string => {
@@ -64,7 +66,6 @@ export default function ReservationForm({
   };
 
   const [showSuccess, setShowSuccess] = useState(false);
-  const [showRemoveSuccess, setShowRemoveSuccess] = useState(false);
   const [selectedTimeSlots, setSelectedTimeSlots] = useState<{
     [date: string]: TimeSlotType;
   }>({});
@@ -803,6 +804,9 @@ export default function ReservationForm({
       if (onSubmit && allBookings.length > 0) {
         onSubmit(allBookings);
 
+        // Show toast for reservation success
+        if (onShowToast) onShowToast("Reservation(s) submitted successfully", "success");
+
         // Clear dropdown selections after submission
         clearAllDropdownSelections();
         setPendingBookings({});
@@ -816,7 +820,6 @@ export default function ReservationForm({
         // The time slots will be preserved and updated when userBookings refreshes
         // Note: selectedSeatsFromClick is managed by the parent component
       }
-      setShowSuccess(true);
     },
     [
       selectedSeatsFromDropdown,
@@ -1506,8 +1509,7 @@ export default function ReservationForm({
                       if (!currentUser) return;
                       if (!booking) return;
                       try {
-                        const allUserBookings =
-                          await bookingService.getUserBookings(currentUser);
+                        const allUserBookings = await bookingService.getUserBookings(currentUser);
                         const fullBooking = allUserBookings.find(
                           (b) =>
                             b.date === dateStr &&
@@ -1515,20 +1517,22 @@ export default function ReservationForm({
                             b.status === "ACTIVE"
                         );
                         if (!fullBooking) return;
-                        await bookingService.cancelBooking(
-                          fullBooking.id,
-                          currentUser
-                        );
-                        // Reset the time slot for this date to default
-                        setSelectedTimeSlots((prev) => {
-                          const newState = { ...prev };
-                          delete newState[dateStr];
-                          return newState;
-                        });
-                        if (onBookingChange) await onBookingChange();
-                        handleClear(); // Clear the time slot selection
-                        setShowRemoveSuccess(true); // Show success toast
+                        const result = await bookingService.cancelBooking(fullBooking.id);
+                        if (result.success) {
+                          if (onShowToast) onShowToast("Reservation deleted successfully", "success");
+                          // Reset the time slot for this date to default
+                          setSelectedTimeSlots((prev) => {
+                            const newState = { ...prev };
+                            delete newState[dateStr];
+                            return newState;
+                          });
+                          if (onBookingChange) await onBookingChange();
+                          handleClear(); // Clear the time slot selection
+                        } else {
+                          if (onShowToast) onShowToast(result.error || "Failed to remove reservation. Please try again.", "error");
+                        }
                       } catch (err) {
+                        if (onShowToast) onShowToast("Failed to cancel booking. Please try again.", "error");
                         console.error("Failed to cancel booking:", err);
                       }
                     }}
@@ -1596,15 +1600,7 @@ export default function ReservationForm({
         </Alert>
       </Snackbar>
 
-      <Snackbar
-        open={showRemoveSuccess}
-        autoHideDuration={4000}
-        onClose={() => setShowRemoveSuccess(false)}
-      >
-        <Alert severity="success" onClose={() => setShowRemoveSuccess(false)}>
-          Booking removed successfully!
-        </Alert>
-      </Snackbar>
+      {/* Remove Snackbar for cancel, use parent's Snackbar for feedback */}
     </>
   );
 }
