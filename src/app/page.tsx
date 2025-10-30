@@ -474,14 +474,8 @@ export default function Home() {
     if (bookings.length > 0 && currentUser) {
       try {
         setBookingError(null);
-        // Only support single booking creation for now
-        const booking = bookings[0];
-        const result = await bookingService.createBooking(
-          currentUser,
-          booking.seatId,
-          booking.timeSlot,
-          booking.date
-        );
+        // Pass all bookings to bookingService for multi-day support
+        const result = await bookingService.createBooking(currentUser, bookings);
         if (result.success) {
           setBookingError("Reservation(s) submitted successfully");
           setBookingErrorSeverity("success");

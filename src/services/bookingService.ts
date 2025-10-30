@@ -28,7 +28,7 @@ export class BookingService {
       timeSlot: r.slot_type,
       bookingTimestamp: r.created_at,
       status: 'ACTIVE',
-      tableNumber: r.table_id.charAt(0),
+      tableNumber: typeof r.table_id === 'string' ? r.table_id.charAt(0) : '',
     }));
   }
 
@@ -47,55 +47,65 @@ export class BookingService {
       timeSlot: r.slot_type,
       bookingTimestamp: r.created_at,
       status: 'ACTIVE',
-      tableNumber: r.table_id.charAt(0),
+      tableNumber: typeof r.table_id === 'string' ? r.table_id.charAt(0) : '',
     }));
   }
 
   // Create a new booking
   async createBooking(
     userId: string,
-    seatId: string,
-    timeSlot: 'AM' | 'PM' | 'FULL_DAY',
-    date?: string
-  ): Promise<{ success: boolean; booking?: BookingRecord; error?: string }> {
-    const bookingDate = date || getTodayDate();
-    // Check if user already has a booking for this date
-    const { data: existingBookings, error: existingError } = await supabase
-      .from('reservations')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('date', bookingDate);
-    if (existingError) {
-      return { success: false, error: existingError.message };
+    bookings: Array<{ seatId: string; timeSlot: 'AM' | 'PM' | 'FULL_DAY'; date: string }>
+  ): Promise<{ success: boolean; bookings?: BookingRecord[]; error?: string }> {
+    const createdBookings: BookingRecord[] = [];
+    for (const booking of bookings) {
+      const bookingDate = booking.date || getTodayDate();
+      // Check if user already has a booking for this date
+      const { data: existingBookings, error: existingError } = await supabase
+        .from('reservations')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('date', bookingDate);
+      if (existingError) {
+        return { success: false, error: existingError.message };
+      }
+      if (existingBookings && existingBookings.length > 0) {
+        // Skip this date, user already has a booking
+        continue;
+      }
+      if (!booking.seatId || typeof booking.seatId !== 'string') {
+        // Skip invalid booking
+        continue;
+      }
+      const newBooking: BookingRecord = {
+        id: generateBookingId(),
+        userId,
+        seatId: booking.seatId,
+        date: bookingDate,
+        timeSlot: booking.timeSlot,
+        bookingTimestamp: new Date().toISOString(),
+        status: 'ACTIVE',
+        tableNumber: booking.seatId.charAt(0),
+      };
+      const reservation = {
+        reservation_id: newBooking.id,
+        user_id: newBooking.userId,
+        table_id: newBooking.seatId,
+        date: newBooking.date,
+        slot_type: newBooking.timeSlot,
+        created_at: newBooking.bookingTimestamp,
+      };
+      const { error } = await supabase
+        .from('reservations')
+        .upsert([reservation], { onConflict: 'reservation_id' });
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      createdBookings.push(newBooking);
     }
-    if (existingBookings && existingBookings.length > 0) {
-      return { success: false, error: 'You already have a booking for this date.' };
+    if (createdBookings.length === 0) {
+      return { success: false, error: 'No new bookings created. You may already have bookings for these dates.' };
     }
-    const newBooking: BookingRecord = {
-      id: generateBookingId(),
-      userId,
-      seatId,
-      date: bookingDate,
-      timeSlot,
-      bookingTimestamp: new Date().toISOString(),
-      status: 'ACTIVE',
-      tableNumber: seatId.charAt(0),
-    };
-    const reservation = {
-      reservation_id: newBooking.id,
-      user_id: newBooking.userId,
-      table_id: newBooking.seatId,
-      date: newBooking.date,
-      slot_type: newBooking.timeSlot,
-      created_at: newBooking.bookingTimestamp,
-    };
-    const { error } = await supabase
-      .from('reservations')
-      .upsert([reservation], { onConflict: 'reservation_id' });
-    if (error) {
-      return { success: false, error: error.message };
-    }
-    return { success: true, booking: newBooking };
+    return { success: true, bookings: createdBookings };
   }
 
   // Cancel a booking
@@ -147,7 +157,7 @@ export class BookingService {
       timeSlot: r.slot_type,
       bookingTimestamp: r.created_at,
       status: 'ACTIVE',
-      tableNumber: r.table_id.charAt(0),
+      tableNumber: typeof r.table_id === 'string' ? r.table_id.charAt(0) : '',
     };
   }
 
