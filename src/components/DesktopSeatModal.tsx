@@ -38,6 +38,11 @@ interface DesktopSeatModalProps {
   } | undefined;
   availableTimeSlots: TimeSlotType[];
   anchorPosition?: { top: number; left: number } | null;
+  seatBookings: Array<{
+    seatId: string;
+    userId: string;
+    timeSlot: 'AM' | 'PM' | 'FULL_DAY';
+  }>;
 }
 
 export default function DesktopSeatModal({
@@ -50,7 +55,8 @@ export default function DesktopSeatModal({
   currentUser,
   currentUserBooking,
   availableTimeSlots,
-  anchorPosition
+  anchorPosition,
+  seatBookings,
 }: DesktopSeatModalProps) {
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<TimeSlotType | ''>('');
 
@@ -161,45 +167,91 @@ export default function DesktopSeatModal({
                 {getSeatDisplayName(seatId)}
               </Typography>
             </Box>
-            {!isCurrentUserBooked && <Chip
-              label={"Free"}
-              color={"success"}
-              sx={{ borderRadius: 2 }}
-            />}
+            {seatBookings.length === 0 ? (
+              <Chip
+                label="Free"
+                color="success"
+                sx={{ borderRadius: 2 }}
+              />
+            ) : availableTimeSlots.length > 0 ? (
+              <Chip
+                label="Partially Booked"
+                color="warning"
+                sx={{ borderRadius: 2 }}
+              />
+            ) : (
+              <Chip
+                label="Fully Booked"
+                color="error"
+                sx={{ borderRadius: 2 }}
+              />
+            )}
           </Box>
         </Box>
 
         {/* Content */}
         <Box>
-        {isCurrentUserBooked ? (
-          // Show booking details when user has already booked
+        {seatBookings.length > 0 ? (
+          // Show all bookings for this seat
           <>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-              <Avatar
-                src={userAvatar[currentUser || '']}
-                sx={{
-                  width: 50,
-                  height: 50,
-                }}
-              >
-                {currentUser?.charAt(0)}
-              </Avatar>
-              <Box>
-                <Typography variant="body1" fontWeight="bold">
-                  {currentUser}
-                </Typography>
-              </Box>
+            <Box sx={{ borderTop: 1, borderColor: 'grey.300', pt: 2, mb: 3 }}>
+              <Typography variant="body2" sx={{ mb: 2, fontWeight: 600 }}>
+                Current Bookings:
+              </Typography>
+              
+              {seatBookings.map((booking, index) => (
+                <Box 
+                  key={index}
+                  sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 2, 
+                    mb: 2,
+                    p: 1.5,
+                    backgroundColor: booking.userId === currentUser ? 'primary.50' : 'grey.50',
+                    borderRadius: 2,
+                    border: booking.userId === currentUser ? '2px solid' : '1px solid',
+                    borderColor: booking.userId === currentUser ? 'primary.main' : 'grey.200',
+                  }}
+                >
+                  <Avatar
+                    src={userAvatar[booking.userId]}
+                    sx={{
+                      width: 40,
+                      height: 40,
+                    }}
+                  >
+                    {booking.userId.charAt(0)}
+                  </Avatar>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" fontWeight="bold">
+                      {booking.userId}
+                      {booking.userId === currentUser && (
+                        <Chip 
+                          label="You" 
+                          size="small" 
+                          color="primary"
+                          sx={{ ml: 1, height: 20, fontSize: '0.7rem' }}
+                        />
+                      )}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {getTimeSlotLabel(booking.timeSlot)}
+                    </Typography>
+                  </Box>
+                </Box>
+              ))}
             </Box>
 
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, pt: 2, borderTop: 1, borderColor: 'grey.300' }}>
               <CalendarTodayIcon fontSize="small" />
-              <Typography variant="body2">
-                {formatDate(selectedDate)} • {getTimeSlotLabel(currentUserBooking?.timeSlot || 'AM')}
+              <Typography variant="body2" color="text.secondary">
+                {formatDate(selectedDate)}
               </Typography>
             </Box>
           </>
         ) : (
-          // Show original booking interface
+          // Show booking interface when seat is free
           <>
             {/* Seat and Date Info */}
             <Box sx={{ borderTop: 1, borderColor: 'grey.300', pt: 2, mb: 3 }}>
@@ -259,8 +311,9 @@ export default function DesktopSeatModal({
         </Box>
 
         {/* Actions */}
-        <Box sx={{ mt: 3 }}>
-          {isCurrentUserBooked ? (
+        <Box sx={{ mt: 3, display: 'flex', gap: 2, flexDirection: 'column' }}>
+          {/* Show remove button if current user has booked */}
+          {isCurrentUserBooked && (
             <Button
               onClick={handleRemove}
               variant="outlined"
@@ -279,13 +332,16 @@ export default function DesktopSeatModal({
                 }
               }}
             >
-              Remove
+              Remove My Booking
             </Button>
-          ) : (
+          )}
+          
+          {/* Show book button if there are available slots */}
+          {availableTimeSlots.length > 0 && (
             <Button
               onClick={handleSubmit}
               variant="contained"
-              disabled={!selectedTimeSlot || availableTimeSlots.length === 0}
+              disabled={!selectedTimeSlot}
               fullWidth
               size="large"
               sx={{
@@ -296,6 +352,13 @@ export default function DesktopSeatModal({
             >
               Book Desk
             </Button>
+          )}
+
+          {/* Show message if fully booked and user hasn't booked */}
+          {availableTimeSlots.length === 0 && !isCurrentUserBooked && (
+            <Alert severity="info" sx={{ borderRadius: 2 }}>
+              This seat is fully booked for the selected date.
+            </Alert>
           )}
         </Box>
       </Paper>

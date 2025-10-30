@@ -39,6 +39,12 @@ export default function SeatModal({
   const currentUserBooking = allBookingsForDate.find(booking =>
     booking.seatId === seatId && booking.userId === currentUser
   );
+
+  // Get all bookings for this specific seat
+  const seatBookings = allBookingsForDate.filter(booking =>
+    booking.seatId === seatId
+  );
+
   // Get available time slots for the selected seat
   const getAvailableTimeSlots = useCallback((seatId: string, dateStr: string): TimeSlotType[] => {
     if (!seatId || !dateStr) return ['AM', 'PM', 'FULL_DAY'];
@@ -90,6 +96,7 @@ export default function SeatModal({
     currentUser,
     currentUserBooking,
     availableTimeSlots,
+    seatBookings, // Pass all bookings for this seat
   };
 
   if (isMobile) {

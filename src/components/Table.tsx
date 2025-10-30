@@ -193,6 +193,26 @@ function Table({
     }
     
     return undefined;
+  }, [tableLetter, bookedSeats]);
+
+  const getBookedByUsers = useCallback((seatNumber: number) => {
+    const seatId = `${tableLetter}${seatNumber}`;
+    const seatBookings = bookedSeats.filter(b => b.seatId === seatId);
+    
+    const result: { am?: string; pm?: string } = {};
+    
+    seatBookings.forEach(booking => {
+      if (booking.timeSlot === "AM") {
+        result.am = booking.userId;
+      } else if (booking.timeSlot === "PM") {
+        result.pm = booking.userId;
+      } else if (booking.timeSlot === "FULL_DAY") {
+        result.am = booking.userId;
+        result.pm = booking.userId;
+      }
+    });
+    
+    return result;
   }, [tableLetter, bookedSeats]);  return (
     <Box sx={{ position: 'relative' }}>
       <Box
@@ -440,6 +460,7 @@ function Table({
                 seatId={seatId}
                 timeSlots={getTimeSlotStatus(seatNumber)}
                 bookedByUser={getBookedByUser(seatNumber)}
+                bookedByUsers={getBookedByUsers(seatNumber)}
               />
             );
           })}
@@ -460,6 +481,7 @@ function Table({
                 seatId={seatId}
                 timeSlots={getTimeSlotStatus(seatNumber)}
                 bookedByUser={getBookedByUser(seatNumber)}
+                bookedByUsers={getBookedByUsers(seatNumber)}
               />
             );
           })}
@@ -483,6 +505,7 @@ function Table({
                 seatId={seatId}
                 timeSlots={getTimeSlotStatus(seatNumber)}
                 bookedByUser={getBookedByUser(seatNumber)}
+                bookedByUsers={getBookedByUsers(seatNumber)}
               />
             );
           })}
@@ -503,6 +526,7 @@ function Table({
                 seatId={seatId}
                 timeSlots={getTimeSlotStatus(seatNumber)}
                 bookedByUser={getBookedByUser(seatNumber)}
+                bookedByUsers={getBookedByUsers(seatNumber)}
               />
             );
           })}
