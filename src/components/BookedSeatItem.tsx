@@ -106,7 +106,7 @@ export default function BookedSeatItem({
           mb: 1,
         }}
       >
-        Select date: <span style={{ fontWeight: 600 }}>{getMonthYear()}</span>
+        Select date <span style={{ fontWeight: 600 }}>{getMonthYear()}</span>
       </Typography>
 
       {/* Date Chips Grid */}

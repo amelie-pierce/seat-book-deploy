@@ -804,28 +804,55 @@ export default function Home() {
   // Handle toggling date selection in drawer
   const handleDateToggle = (seatId: string, dateStr: string, currentlyBooked: boolean) => {
     setDateModifications((prev) => {
-      const seatMods = prev[seatId] || {};
+      const newMods = { ...prev };
+      const seatMods = newMods[seatId] || {};
       const newSeatMods = { ...seatMods };
       
       // Check if there's already a modification for this date
       const hasModification = newSeatMods[dateStr] !== undefined;
       
+      // Calculate what the effective state will be after this toggle
+      let willBeBooked = false;
+      
       if (hasModification) {
-        // If already modified, remove the modification (revert to original state)
+        // If already modified, toggling will revert to original state
+        willBeBooked = currentlyBooked;
         delete newSeatMods[dateStr];
       } else {
         // No modification yet, toggle from original state
         if (currentlyBooked) {
           newSeatMods[dateStr] = false; // Mark for removal
+          willBeBooked = false;
         } else {
           newSeatMods[dateStr] = true; // Mark for addition
+          willBeBooked = true;
         }
       }
       
-      return {
-        ...prev,
-        [seatId]: newSeatMods,
-      };
+      // If this seat will be booked on this date, unbook any other seats on the same date
+      if (willBeBooked) {
+        // Find all other seats that are booked (or will be booked) on this date
+        userBookings.forEach(booking => {
+          if (booking.date === dateStr && booking.seatId !== seatId) {
+            // Mark originally booked seats for removal
+            if (!newMods[booking.seatId]) {
+              newMods[booking.seatId] = {};
+            }
+            newMods[booking.seatId][dateStr] = false; // Mark for removal
+          }
+        });
+        
+        // Also check for any seats that are not originally booked but marked for addition
+        Object.entries(newMods).forEach(([otherSeatId, otherMods]) => {
+          if (otherSeatId !== seatId && otherMods[dateStr] === true) {
+            // This other seat is marked for addition on the same date, remove the modification
+            delete newMods[otherSeatId][dateStr];
+          }
+        });
+      }
+      
+      newMods[seatId] = newSeatMods;
+      return newMods;
     });
   };
 
