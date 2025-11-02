@@ -12,6 +12,7 @@ import {
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { format } from 'date-fns';
+import { SEATING_CONFIG } from '../config/seatingConfig';
 
 const userAvatar = {
   1234: 'https://i.pravatar.cc/150?img=1',
@@ -122,8 +123,10 @@ export default function DesktopSeatModal({
 
   const getSeatDisplayName = (seatId: string) => {
     const tableLetter = seatId.charAt(0);
-    const seatNumber = seatId.slice(1);
-    return `Desk ${tableLetter}, Table ${seatNumber}`;
+    const zoneName = SEATING_CONFIG.zones.zone1.tables.includes(tableLetter) 
+      ? 'Zone A' 
+      : 'Zone B';
+    return `Desk ${seatId} - ${zoneName}`;
   };
   
   return (
@@ -181,7 +184,7 @@ export default function DesktopSeatModal({
               />
             ) : (
               <Chip
-                label="Fully Booked"
+                label="Booked"
                 color="error"
                 sx={{ borderRadius: 2 }}
               />

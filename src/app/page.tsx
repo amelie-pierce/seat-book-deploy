@@ -607,9 +607,23 @@ export default function Home() {
     seatId: string,
     timeSlot: "AM" | "PM" | "FULL_DAY"
   ) => {
-    if (!mobileSeatModalDate) return;
+    if (!mobileSeatModalDate || !currentUser) return;
 
     try {
+      // Check if user already has a booking on this date
+      const existingBookingOnDate = userBookings.find(
+        (booking) =>
+          booking.date === mobileSeatModalDate &&
+          booking.status === "ACTIVE"
+      );
+
+      // If there's an existing booking on a different seat, remove it first
+      if (existingBookingOnDate && existingBookingOnDate.seatId !== seatId) {
+        console.log(`Moving booking from ${existingBookingOnDate.seatId} to ${seatId}`);
+        await bookingService.cancelBooking(existingBookingOnDate.id, currentUser);
+      }
+
+      // Create the new booking
       const bookings = [
         {
           date: mobileSeatModalDate,
