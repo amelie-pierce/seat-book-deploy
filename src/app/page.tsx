@@ -11,12 +11,15 @@ import {
   Avatar,
   Chip,
   Button,
+  Autocomplete,
+  TextField,
 } from "@mui/material";
 import {
   ExitToApp as LogoutIcon,
   Home as HomeIcon,
   DirectionsCar as CarIcon,
   Menu as MenuIcon,
+  Add as AddIcon,
 } from "@mui/icons-material";
 import SeatingLayout from "../components/SeatingLayout";
 import SeatModal from "../components/SeatModal";
@@ -225,6 +228,10 @@ export default function Home() {
   const [otherUsersBookings, setOtherUsersBookings] = useState<{
     [seatId: string]: string[];
   }>({});
+
+  // Track temporary seats added via the plus button (not yet saved)
+  const [tempSeats, setTempSeats] = useState<string[]>([]);
+  const [showAddSeatDropdown, setShowAddSeatDropdown] = useState(false);
 
   // Memoize filtered userBookings to prevent infinite loops in ReservationForm
   const activeUserBookings = useMemo(() => {
@@ -801,6 +808,36 @@ export default function Home() {
     }
   };
 
+  // Get available seats that aren't already in user's booking list or temp seats
+  const getAvailableSeatsForDropdown = () => {
+    const allSeats = generateAllSeats(SEATING_CONFIG);
+    const userSeatIds = [...new Set(userBookings.map(b => b.seatId))];
+    
+    // Filter out seats that are already in user's bookings or temp seats
+    return allSeats.filter(seatId => 
+      !userSeatIds.includes(seatId) && !tempSeats.includes(seatId)
+    );
+  };
+
+  // Handle adding a temporary seat
+  const handleAddTempSeat = (seatId: string) => {
+    if (seatId && !tempSeats.includes(seatId)) {
+      setTempSeats(prev => [...prev, seatId]);
+      setShowAddSeatDropdown(false);
+    }
+  };
+
+  // Handle deleting a temporary seat
+  const handleDeleteTempSeat = (seatId: string) => {
+    setTempSeats(prev => prev.filter(id => id !== seatId));
+    // Also remove any modifications for this temp seat
+    setDateModifications(prev => {
+      const newMods = { ...prev };
+      delete newMods[seatId];
+      return newMods;
+    });
+  };
+
   // Handle toggling date selection in drawer
   const handleDateToggle = (seatId: string, dateStr: string, currentlyBooked: boolean) => {
     setDateModifications((prev) => {
@@ -863,7 +900,7 @@ export default function Home() {
     try {
       setIsLoadingBookings(true);
 
-      // Process all modifications
+      // Process all modifications (including temp seats)
       for (const [seatId, modifications] of Object.entries(dateModifications)) {
         for (const [dateStr, shouldBook] of Object.entries(modifications)) {
           if (shouldBook) {
@@ -888,8 +925,9 @@ export default function Home() {
         }
       }
 
-      // Clear modifications
+      // Clear modifications and temp seats
       setDateModifications({});
+      setTempSeats([]);
 
       // Refresh user bookings
       const refreshedData = await bookingService.loadUserData(currentUser);
@@ -1331,7 +1369,31 @@ export default function Home() {
                   );
                 })}
 
-                {userBookings.length === 0 && (
+                {/* Temporary seats (not yet saved) */}
+                {tempSeats.map((seatId) => {
+                  const tableLetter = seatId.charAt(0);
+                  const zone = SEATING_CONFIG.zones.zone1.tables.includes(tableLetter) 
+                    ? "A" 
+                    : "B";
+
+                  return (
+                    <BookedSeatItem
+                      key={`temp-${seatId}`}
+                      seatId={seatId}
+                      zone={zone}
+                      bookedDates={[]} // No dates booked yet
+                      allDates={dateChips.dates}
+                      onDelete={() => handleDeleteTempSeat(seatId)}
+                      onDateToggle={(dateStr, currentlyBooked) => 
+                        handleDateToggle(seatId, dateStr, currentlyBooked)
+                      }
+                      modifiedDates={dateModifications[seatId] || {}}
+                      disabledDates={otherUsersBookings[seatId] || []}
+                    />
+                  );
+                })}
+
+                {userBookings.length === 0 && tempSeats.length === 0 && (
                   <Box
                     sx={{
                       textAlign: "center",
@@ -1346,55 +1408,135 @@ export default function Home() {
                 )}
               </Box>
 
-              {/* Drawer Footer with Buttons */}
+              {/* Drawer Footer with Buttons and Dropdown */}
               <Box
                 sx={{
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  gap: 2,
-                  p: 2,
                   backgroundColor: "#fff",
+                  borderTop: "1px solid #E5E7EB",
                 }}
               >
-                <Button
-                  variant="contained"
-                  onClick={handleDrawerToggle}
+                {/* Add Seat Dropdown */}
+                {showAddSeatDropdown && (
+                  <Box
+                    sx={{
+                      p: 2,
+                      borderBottom: "1px solid #E5E7EB",
+                    }}
+                  >
+                    <Autocomplete
+                      options={getAvailableSeatsForDropdown()}
+                      getOptionLabel={(seatId) => {
+                        const tableLetter = seatId.charAt(0);
+                        const zone = SEATING_CONFIG.zones.zone1.tables.includes(tableLetter) 
+                          ? "A" 
+                          : "B";
+                        return `Desk ${seatId} - Zone ${zone}`;
+                      }}
+                      onChange={(_, value) => {
+                        if (value) {
+                          handleAddTempSeat(value);
+                        }
+                      }}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          placeholder="Search and select a seat..."
+                          size="small"
+                          sx={{
+                            "& .MuiOutlinedInput-root": {
+                              "& fieldset": {
+                                borderColor: "#FF6B35",
+                              },
+                              "&:hover fieldset": {
+                                borderColor: "#E55A2B",
+                              },
+                              "&.Mui-focused fieldset": {
+                                borderColor: "#FF6B35",
+                              },
+                            },
+                          }}
+                        />
+                      )}
+                    />
+                  </Box>
+                )}
+
+                {/* Button Row */}
+                <Box
                   sx={{
-                    textTransform: "none",
-                    px: 4,
-                    py: 1,
-                    backgroundColor: "#E5E7EB",
-                    color: "#374151",
-                    boxShadow: "none",
-                    "&:hover": {
-                      backgroundColor: "#D1D5DB",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    p: 2,
+                  }}
+                >
+                  {/* Close Button - Left */}
+                  <Button
+                    variant="contained"
+                    onClick={handleDrawerToggle}
+                    sx={{
+                      textTransform: "none",
+                      px: 4,
+                      py: 1,
+                      backgroundColor: "#E5E7EB",
+                      color: "#374151",
                       boxShadow: "none",
-                    },
-                  }}
-                >
-                  Close
-                </Button>
-                <Button
-                  variant="contained"
-                  onClick={handleUpdateBookings}
-                  disabled={Object.keys(dateModifications).length === 0 || isLoadingBookings}
-                  sx={{
-                    textTransform: "none",
-                    px: 4,
-                    py: 1,
-                    backgroundColor: "#FF6B35",
-                    "&:hover": {
-                      backgroundColor: "#E55A2B",
-                    },
-                    "&:disabled": {
-                      backgroundColor: "#D1D5DB",
-                      color: "#9CA3AF",
-                    },
-                  }}
-                >
-                  {isLoadingBookings ? "Updating..." : "Update"}
-                </Button>
+                      "&:hover": {
+                        backgroundColor: "#D1D5DB",
+                        boxShadow: "none",
+                      },
+                    }}
+                  >
+                    Close
+                  </Button>
+
+                  {/* Right Side Buttons */}
+                  <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+                    {/* Plus Button */}
+                    <Button
+                      variant="contained"
+                      onClick={() => setShowAddSeatDropdown(!showAddSeatDropdown)}
+                      sx={{
+                        textTransform: "none",
+                        minWidth: "auto",
+                        width: "40px",
+                        height: "40px",
+                        p: 0,
+                        backgroundColor: "#E5E7EB",
+                        color: "#374151",
+                        boxShadow: "none",
+                        "&:hover": {
+                          backgroundColor: "#D1D5DB",
+                          boxShadow: "none",
+                        },
+                      }}
+                    >
+                      <AddIcon />
+                    </Button>
+
+                    {/* Update Button */}
+                    <Button
+                      variant="contained"
+                      onClick={handleUpdateBookings}
+                      disabled={(Object.keys(dateModifications).length === 0 && tempSeats.length === 0) || isLoadingBookings}
+                      sx={{
+                        textTransform: "none",
+                        px: 4,
+                        py: 1,
+                        backgroundColor: "#FF6B35",
+                        "&:hover": {
+                          backgroundColor: "#E55A2B",
+                        },
+                        "&:disabled": {
+                          backgroundColor: "#D1D5DB",
+                          color: "#9CA3AF",
+                        },
+                      }}
+                    >
+                      {isLoadingBookings ? "Updating..." : "Update"}
+                    </Button>
+                  </Box>
+                </Box>
               </Box>
             </>
           )}
