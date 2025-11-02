@@ -71,7 +71,18 @@ function SeatButton({
   return (
     <IconButton
       data-seat-id={seatId}
-      onClick={isDisabled ? undefined : onClick}
+      onClick={(e) => {
+        if (!isDisabled && onClick) {
+          e.stopPropagation();
+          onClick(e);
+        }
+      }}
+      onMouseDown={(e) => {
+        e.stopPropagation();
+      }}
+      onTouchStart={(e) => {
+        e.stopPropagation();
+      }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       disabled={isDisabled}

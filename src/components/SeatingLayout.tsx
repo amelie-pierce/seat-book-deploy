@@ -149,8 +149,8 @@ export default function SeatingLayout({
           minScale={0.2}
           maxScale={3}
           centerOnInit={true}
-          centerZoomedOut={true}
-          alignmentAnimation={{ disabled: false }}
+          centerZoomedOut={false}
+          alignmentAnimation={{ disabled: true }}
           wheel={{
             step: 0.1,
           }}
@@ -159,8 +159,7 @@ export default function SeatingLayout({
           }}
           limitToBounds={false}
           doubleClick={{
-            disabled: false,
-            mode: "reset",
+            disabled: true,
           }}
           panning={{
             velocityDisabled: true,
@@ -343,6 +342,12 @@ export default function SeatingLayout({
               >
                 <Box
                   id="seating-fullmap"
+                  onDoubleClick={() => {
+                    const fullMapElement = document.getElementById("seating-fullmap");
+                    if (fullMapElement) {
+                      zoomToElement(fullMapElement as HTMLElement, 0.4, 500);
+                    }
+                  }}
                   sx={{
                     display: "flex",
                     gap: 6,
