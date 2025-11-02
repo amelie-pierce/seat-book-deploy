@@ -17,9 +17,9 @@ import {
 import {
   ExitToApp as LogoutIcon,
   Home as HomeIcon,
-  DirectionsCar as CarIcon,
   Menu as MenuIcon,
   Add as AddIcon,
+  Work as BriefcaseIcon,
 } from "@mui/icons-material";
 import SeatingLayout from "../components/SeatingLayout";
 import SeatModal from "../components/SeatModal";
@@ -1238,15 +1238,17 @@ export default function Home() {
             // Determine icon based on whether user has booking for this date
             const userBookingForDate = userBookings.find(b => b.date === dateStr);
             const hasBooking = !!userBookingForDate;
-            const IconComponent = hasBooking ? CarIcon : HomeIcon;
+            const IconComponent = hasBooking ? BriefcaseIcon : HomeIcon;
 
+            // Set colors: white for selected, green for unselected with booking, gray for no booking
             const chipColor = isCurrentDate ? "#fff" : "#6B7280";
+            const iconColor = isCurrentDate ? "#fff" : (hasBooking ? "#61BF76" : "#6B7280");
 
             return (
               <Chip
                 clickable={!isPastDate}
                 key={dateStr}
-                icon={<IconComponent sx={{ fontSize: '1rem', color: chipColor }} />}
+                icon={<IconComponent sx={{ fontSize: '1rem', color: iconColor }} />}
                 label={displayLabel}
                 sx={{
                   cursor: isPastDate ? "not-allowed" : "pointer",
@@ -1266,7 +1268,7 @@ export default function Home() {
                   '& .MuiChip-icon': {
                     marginLeft: '0px',
                     marginRight: '6px',
-                    color: chipColor,
+                    color: iconColor,
                   },
                   '&:hover': {
                     backgroundColor: isPastDate ? undefined : (isCurrentDate ? "primary.dark" : "#D1D5DB"),
