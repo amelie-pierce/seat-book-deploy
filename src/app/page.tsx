@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useState, useMemo } from "react";
+import { useCallback, useState, useMemo, useEffect } from "react";
 import {
   Container,
   Box,
@@ -29,7 +29,6 @@ import { SEATING_CONFIG, generateAllSeats } from "../config/seatingConfig";
 import { bookingService } from "../services/bookingService";
 import { vercelDataService } from "../services/vercelDataService";
 import { BookingRecord } from "../utils/bookingStorage";
-import { useEffect } from "react";
 
 const userAvatar = {
   1234: 'https://i.pravatar.cc/150?img=1',
@@ -210,6 +209,9 @@ export default function Home() {
   // Desktop tab state
   const [drawerOpen, setDrawerOpen] = useState(false);
 
+  // Disable animations during resize
+  const [isResizing, setIsResizing] = useState(false);
+
   // Mobile seat modal state
   const [mobileSeatModalOpen, setMobileSeatModalOpen] = useState(false);
   const [mobileSeatModalSeatId, setMobileSeatModalSeatId] =
@@ -257,6 +259,25 @@ export default function Home() {
       window.location.href = "/auth";
     }
   }, [currentUser, isLoading]);
+
+  // Disable animations during window resize
+  useEffect(() => {
+    let resizeTimer: NodeJS.Timeout;
+    
+    const handleResize = () => {
+      setIsResizing(true);
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        setIsResizing(false);
+      }, 150);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(resizeTimer);
+    };
+  }, []);
 
   // Initialize database and load user data when app opens
   useEffect(() => {
@@ -1322,7 +1343,7 @@ export default function Home() {
               bottom: 0,
               backgroundColor: "rgba(0, 0, 0, 0.5)",
               zIndex: 1299,
-              transition: "opacity 0.3s ease-in-out",
+              transition: isResizing ? "none" : "opacity 0.3s ease-in-out",
               pointerEvents: "auto",
             }}
           />
@@ -1334,9 +1355,9 @@ export default function Home() {
             flex: 1,
             backgroundColor: "#f8f9fa",
             overflow: "hidden",
-            width: drawerOpen ? { xs: 0, md: "50%" } : "100%",
+            width: drawerOpen ? { xs: 0, md: "60%" } : "100%",
             display: drawerOpen ? { xs: "none", md: "block" } : "block",
-            transition: "width 0.3s ease-in-out",
+            transition: isResizing ? "none" : "width 0.3s ease-in-out",
           }}
         >
           <SeatingLayout
@@ -1358,10 +1379,10 @@ export default function Home() {
         {/* Drawer for List View - Side by Side */}
         <Box
           sx={{
-            width: { xs: "100%", md: drawerOpen ? "50%" : 0 },
-            maxWidth: { xs: "100%", md: drawerOpen ? "600px" : 0 },
+            width: { xs: "100%", md: drawerOpen ? "45%" : 0 },
+            maxWidth: { xs: "100%", md: drawerOpen ? "450px" : 0 },
             overflow: "hidden",
-            transition: {
+            transition: isResizing ? "none" : {
               xs: "transform 0.3s ease-in-out",
               md: "width 0.3s ease-in-out, max-width 0.3s ease-in-out",
             },
@@ -1383,22 +1404,31 @@ export default function Home() {
             pointerEvents: { xs: drawerOpen ? "auto" : "none", md: "auto" },
           }}
         >
-          {drawerOpen && (
-            <>
-              {/* Drawer Navbar */}
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  position: "relative",
-                  px: 2,
-                  py: 1.25,
-                  backgroundColor: "#FF6B35",
-                  color: "#fff",
-                  minHeight: "56px",
-                }}
-              >
+          <Box
+            sx={{
+              opacity: drawerOpen ? 1 : 0,
+              transition: isResizing ? "none" : "opacity 0.5s ease-in-out",
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            {drawerOpen && (
+              <>
+                {/* Drawer Navbar */}
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    position: "relative",
+                    px: 2,
+                    py: 1.25,
+                    backgroundColor: "#FF6B35",
+                    color: "#fff",
+                    minHeight: "56px",
+                  }}
+                >
                 <IconButton
                   onClick={handleDrawerToggle}
                   sx={{
@@ -1640,6 +1670,7 @@ export default function Home() {
               </Box>
             </>
           )}
+          </Box>
         </Box>
       </Box>
 
