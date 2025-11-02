@@ -1,7 +1,6 @@
-import { Box, Chip, IconButton, Tooltip, Typography } from "@mui/material";
-import { ZoomIn, ZoomOut, CenterFocusStrong, Menu as MenuIcon } from "@mui/icons-material";
+import { Box, IconButton, Tooltip, Typography, Button } from "@mui/material";
+import { ZoomIn, ZoomOut, CenterFocusStrong, FormatListBulleted } from "@mui/icons-material";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
-import EventNoteIcon from '@mui/icons-material/EventNote';
 import { useMemo, useRef } from "react";
 import Image from "next/image";
 import Table from "./Table";
@@ -15,7 +14,6 @@ interface SeatingLayoutProps {
   selectedSeatsFromDropdown?: { [date: string]: string };
   seatingConfig: SeatingConfig;
   selectedDate?: string;
-  onDateClick?: (date: string) => void;
   bookedSeats?: Array<{
     seatId: string;
     userId: string;
@@ -24,6 +22,8 @@ interface SeatingLayoutProps {
   currentUser?: string;
   timeSlot?: "AM" | "PM" | "FULL_DAY";
   onToggleDrawer?: () => void;
+  drawerOpen?: boolean;
+  isWeekend?: boolean;
 }
 
 export default function SeatingLayout({
@@ -33,10 +33,12 @@ export default function SeatingLayout({
   selectedSeatsFromDropdown = {},
   seatingConfig,
   selectedDate,
-  onDateClick,
   bookedSeats = [],
   currentUser,
   timeSlot,
+  onToggleDrawer,
+  drawerOpen = false,
+  isWeekend = false,
 }: SeatingLayoutProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const transformRef = useRef<any>(null);
@@ -73,56 +75,6 @@ export default function SeatingLayout({
       zoomToElement(seatElement as HTMLElement, 0.5, 500);
     }
   };
-
-  // Helper function to convert local date to YYYY-MM-DD string without timezone issues
-  const formatLocalDate = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
-  // Memoize date chips generation to avoid recalculating on every render
-  const dateChips = useMemo(() => {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const currentHour = now.getHours();
-    const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 5 = Friday, 6 = Saturday
-    const dates: Date[] = [];
-
-    // Check if it's after 3 PM on Friday
-    const isAfterFridayDeadline = currentDay === 5 && currentHour >= 15; // Friday and >= 3 PM
-
-    if (isAfterFridayDeadline) {
-      // Show next week's working days (Monday to Friday)
-      const nextMonday = new Date(today);
-      const daysUntilNextMonday = (8 - currentDay) % 7; // Days until next Monday
-      nextMonday.setDate(today.getDate() + daysUntilNextMonday);
-
-      for (let i = 0; i < 5; i++) {
-        const date = new Date(nextMonday);
-        date.setDate(nextMonday.getDate() + i);
-        dates.push(date);
-      }
-    } else {
-      // Show current week's working days (Monday to Friday)
-      const monday = new Date(today);
-      const daysFromMonday = (currentDay + 6) % 7; // Calculate days since Monday
-      monday.setDate(today.getDate() - daysFromMonday);
-
-      for (let i = 0; i < 5; i++) {
-        const date = new Date(monday);
-        date.setDate(monday.getDate() + i);
-        dates.push(date);
-      }
-    }
-
-    return {
-      dates,
-      today,
-      isAfterFridayDeadline,
-    };
-  }, []); // Only recalculate when component mounts
 
   // Compute the effective selected seat - prioritize user's booked seat for current date
   const effectiveSelectedSeat = useMemo(() => {
@@ -190,72 +142,25 @@ export default function SeatingLayout({
         >
           {({ zoomIn, zoomOut, zoomToElement }) => (
             <>
-              {/* Date header chips - full width and sticky at top */}
+              {/* Second Row: Location controls and My Booked List button */}
               <Box
                 sx={{
-                  display: "inline-flex",
-                  alignItems: { xs: "flex-start", sm: "center" },
+                  display: "flex",
+                  alignItems: "center",
                   justifyContent: "space-between",
                   px: 2,
                   py: 1,
-                  background: "#F2F2F2",
-                  overflow: "hidden",
-                  gap: { xs: 2, sm: 4 },
+                  background: "transparent",
                   borderRadius: 2,
-                  overflowY: "hidden",
-                  flexDirection: { xs: "column", sm: "row" },
-                  width: { xs: '100%', sm: 'auto' }
+                  gap: 2,
+                  width: "100%",
                 }}
               >
-                <Box sx={{
-                  display: "flex",
-                  gap: 1, flex: 1,
-                  alignItems: "center",
-                  overflowX: "auto",
-                  width: { xs: '100%', sm: 'auto' },
-                  py: 1, overflowY: 'hidden'
-                }}>
-                  <Typography fontWeight={600}>Date: </Typography>
-                  {dateChips.dates.map((date) => {
-                    const dateStr = formatLocalDate(date);
-                    const isCurrentDate = dateStr === selectedDate;
-                    // console.log('date', date, 'datestring', dateStr);
-
-                    // Check if date is in the past (same logic as ReservationForm)
-                    const isPastDate =
-                      !dateChips.isAfterFridayDeadline && date < dateChips.today;
-
-                    return (
-                      <Chip
-                        icon={<EventNoteIcon fontSize="small" color="inherit" />}
-                        clickable={!isPastDate}
-                        key={dateStr}
-                        label={date.toLocaleDateString()}
-                        sx={{
-                          cursor: isPastDate ? "not-allowed" : "pointer",
-                          opacity: isPastDate ? 0.5 : 1,
-                          fontSize: "0.875rem",
-                          borderRadius: 1,
-                          color: isCurrentDate ? "#fff" : "#1C262C",
-                          backgroundColor: isCurrentDate ? "primary.main" : "#fff",
-                          fontWeight: 600,
-                          display: 'inline-flex',
-                        }}
-                        onClick={
-                          onDateClick && !isPastDate
-                            ? () => onDateClick(dateStr)
-                            : undefined
-                        }
-                      />
-                    );
-                  })}
-                </Box>
                 {/* Zone Focus Controls */}
                 <Box
                   sx={{
                     display: "flex",
                     gap: 1,
-                    padding: 1,
                     alignItems: "center",
                   }}
                 >
@@ -273,6 +178,26 @@ export default function SeatingLayout({
                     onClick={() => handleZoneFocus("meeting", zoomToElement)}
                   />
                 </Box>
+                
+                {/* My Booked List Button - Hidden when drawer is open */}
+                {!drawerOpen && (
+                  <Button
+                    variant="contained"
+                    startIcon={<FormatListBulleted />}
+                    onClick={onToggleDrawer}
+                    sx={{
+                      textTransform: "none",
+                      fontWeight: 600,
+                      px: 2,
+                      backgroundColor: "#FF6B35",
+                      "&:hover": {
+                        backgroundColor: "#E55A2B",
+                      },
+                    }}
+                  >
+                    My booked list
+                  </Button>
+                )}
               </Box>
               {/* Zoom Control Buttons */}
               <Box
@@ -444,6 +369,7 @@ export default function SeatingLayout({
                           bookedSeats={bookedSeats}
                           currentUser={currentUser}
                           timeSlot={timeSlot}
+                          isWeekend={isWeekend}
                         />
                       ))}
                     </Box>
@@ -498,6 +424,7 @@ export default function SeatingLayout({
                           currentUser={currentUser}
                           timeSlot={timeSlot}
                           rotated={true}
+                          isWeekend={isWeekend}
                         />
                       ))}
                     </Box>

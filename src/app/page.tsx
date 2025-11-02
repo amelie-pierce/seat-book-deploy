@@ -7,19 +7,20 @@ import {
   CircularProgress,
   Alert,
   Snackbar,
-  Tabs,
-  Tab,
   IconButton,
   Avatar,
+  Chip,
+  Button,
 } from "@mui/material";
 import {
   ExitToApp as LogoutIcon,
-  Event as EventIcon,
-  Chair as ChairIcon,
+  Home as HomeIcon,
+  DirectionsCar as CarIcon,
+  Menu as MenuIcon,
 } from "@mui/icons-material";
 import SeatingLayout from "../components/SeatingLayout";
-import ReservationForm from "../components/ReservationForm";
 import SeatModal from "../components/SeatModal";
+import BookedSeatItem from "../components/BookedSeatItem";
 import { useUserSession } from "../hooks/useUserSession";
 import { SEATING_CONFIG, generateAllSeats } from "../config/seatingConfig";
 import { bookingService } from "../services/bookingService";
@@ -45,6 +46,88 @@ export default function Home() {
   };
 
   const todayDate = formatLocalDate(new Date());
+
+  // Check if a given date string is a weekend (Saturday = 6, Sunday = 0)
+  const isDateWeekend = (dateStr: string): boolean => {
+    const date = new Date(dateStr + 'T00:00:00'); // Add time to avoid timezone issues
+    const dayOfWeek = date.getDay();
+    return dayOfWeek === 0 || dayOfWeek === 6;
+  };
+
+  // Check if a given date string is in the past
+  const isDateInPast = (dateStr: string): boolean => {
+    const date = new Date(dateStr + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time to compare only dates
+    return date < today;
+  };
+
+  // Generate 10 working days with Friday 3 PM deadline logic
+  const dateChips = useMemo(() => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const currentHour = now.getHours();
+    const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 5 = Friday, 6 = Saturday
+    const dates: Date[] = [];
+
+    // Check if it's after 3 PM on Friday
+    const isAfterFridayDeadline = currentDay === 5 && currentHour >= 15; // Friday and >= 3 PM
+
+    if (isAfterFridayDeadline) {
+      // Show next two weeks' working days (10 working days)
+      const nextMonday = new Date(today);
+      const daysUntilNextMonday = (8 - currentDay) % 7; // Days until next Monday
+      nextMonday.setDate(today.getDate() + daysUntilNextMonday);
+
+      // Add 10 working days (2 weeks of Mon-Fri)
+      let addedDays = 0;
+      let currentDate = new Date(nextMonday);
+      while (addedDays < 10) {
+        const dayOfWeek = currentDate.getDay();
+        // Only add weekdays (Monday = 1 to Friday = 5)
+        if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+          dates.push(new Date(currentDate));
+          addedDays++;
+        }
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+    } else {
+      // Show current and next week's working days (10 working days)
+      const monday = new Date(today);
+      const daysFromMonday = (currentDay + 6) % 7; // Calculate days since Monday
+      monday.setDate(today.getDate() - daysFromMonday);
+
+      // Add 10 working days (2 weeks of Mon-Fri)
+      let addedDays = 0;
+      let currentDate = new Date(monday);
+      while (addedDays < 10) {
+        const dayOfWeek = currentDate.getDay();
+        // Only add weekdays (Monday = 1 to Friday = 5)
+        if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+          dates.push(new Date(currentDate));
+          addedDays++;
+        }
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+    }
+
+    return {
+      dates,
+      today,
+      isAfterFridayDeadline,
+    };
+  }, []); // Only recalculate when component mounts
+
+  // Get month and year from first date
+  const monthYearLabel = useMemo(() => {
+    if (dateChips.dates.length > 0) {
+      const firstDate = dateChips.dates[0];
+      const monthName = firstDate.toLocaleDateString('en-US', { month: 'long' });
+      const year = firstDate.getFullYear();
+      return `${monthName}, ${year}:`;
+    }
+    return 'Dates:';
+  }, [dateChips.dates]);
 
   // Function to get the first available (non-disabled) date
   const getFirstAvailableDate = () => {
@@ -122,7 +205,7 @@ export default function Home() {
   >([]);
 
   // Desktop tab state
-  const [desktopTabValue, setDesktopTabValue] = useState(0);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Mobile seat modal state
   const [mobileSeatModalOpen, setMobileSeatModalOpen] = useState(false);
@@ -130,6 +213,18 @@ export default function Home() {
     useState<string>("");
   const [mobileSeatModalDate, setMobileSeatModalDate] = useState<string>("");
   const [modalAnchorPosition, setModalAnchorPosition] = useState<{ top: number; left: number } | null>(null);
+
+  // Track modifications for drawer update functionality
+  // Format: { seatId: { dateStr: boolean } } where true = add booking, false = remove booking
+  const [dateModifications, setDateModifications] = useState<{
+    [seatId: string]: { [dateStr: string]: boolean };
+  }>({});
+
+  // Track dates booked by other users for each seat
+  // Format: { seatId: string[] } where array contains date strings booked by others
+  const [otherUsersBookings, setOtherUsersBookings] = useState<{
+    [seatId: string]: string[];
+  }>({});
 
   // Memoize filtered userBookings to prevent infinite loops in ReservationForm
   const activeUserBookings = useMemo(() => {
@@ -278,6 +373,55 @@ export default function Home() {
     handleInitialLoad();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser]);
+
+  // Load other users' bookings for seats that the current user has booked
+  useEffect(() => {
+    const loadOtherUsersBookings = async () => {
+      if (!currentUser || userBookings.length === 0) {
+        setOtherUsersBookings({});
+        return;
+      }
+
+      try {
+        // Get unique seat IDs from user's bookings
+        const userSeatIds = [...new Set(userBookings.map(b => b.seatId))];
+        const otherBookings: { [seatId: string]: string[] } = {};
+
+        // For each seat, get all bookings and filter for other users
+        for (const seatId of userSeatIds) {
+          // Get all dates to check
+          const datesToCheck = dateChips.dates.map(date => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+          });
+
+          const bookedByOthers: string[] = [];
+
+          // Check each date for bookings by other users
+          for (const dateStr of datesToCheck) {
+            const dateBookings = await bookingService.getBookingsForDate(dateStr);
+            const otherUserBooking = dateBookings.find(
+              b => b.seatId === seatId && b.userId !== currentUser && b.status === 'ACTIVE'
+            );
+            
+            if (otherUserBooking) {
+              bookedByOthers.push(dateStr);
+            }
+          }
+
+          otherBookings[seatId] = bookedByOthers;
+        }
+
+        setOtherUsersBookings(otherBookings);
+      } catch (error) {
+        console.error("Error loading other users' bookings:", error);
+      }
+    };
+
+    loadOtherUsersBookings();
+  }, [currentUser, userBookings, dateChips.dates]);
 
   const handleSeatClick = (seatId: string, event?: React.MouseEvent<HTMLButtonElement>) => {
     // Check seat availability using the new logic
@@ -473,11 +617,8 @@ export default function Home() {
     }
   };
 
-  const handleDesktopTabChange = (
-    event: React.SyntheticEvent,
-    newValue: number
-  ) => {
-    setDesktopTabValue(newValue);
+  const handleDrawerToggle = () => {
+    setDrawerOpen(!drawerOpen);
   };
 
   const handleReservation = async (
@@ -610,6 +751,149 @@ export default function Home() {
     }
   };
 
+  // Handle deleting all bookings for a specific seat
+  const handleDeleteSeatBookings = async (seatId: string) => {
+    if (!currentUser) return;
+
+    try {
+      // Reload user data to get full booking records with IDs
+      const userData = await bookingService.loadUserData(currentUser);
+      
+      // Find all booking IDs for this seat
+      const bookingsToDelete = userData.userBookings.filter(
+        (b: BookingRecord) => b.seatId === seatId
+      );
+      
+      // Delete each booking
+      for (const booking of bookingsToDelete) {
+        await bookingService.cancelBooking(booking.id, currentUser);
+      }
+
+      // Refresh user bookings after deletion
+      const refreshedData = await bookingService.loadUserData(currentUser);
+      setUserBookings(refreshedData.userBookings);
+
+      // Refresh all bookings for the current date if needed
+      if (selectedDate) {
+        const dateBookings = await bookingService.getBookingsForDate(selectedDate);
+        const bookedSeatsData = dateBookings.map((booking) => ({
+          seatId: booking.seatId,
+          userId: booking.userId,
+          timeSlot: booking.timeSlot,
+        }));
+        setAllBookingsForDate(bookedSeatsData);
+
+        // Refresh available seats
+        const reservedSeats = dateBookings.map((b) => b.seatId);
+        const seats = generateAllSeats(SEATING_CONFIG).filter(
+          (seat) => !reservedSeats.includes(seat)
+        );
+        setAvailableSeatsForDate(seats);
+      }
+
+      // Clear selected seat if it was the deleted one
+      if (selectedSeat === seatId) {
+        setSelectedSeat(null);
+      }
+    } catch (error) {
+      console.error("Error deleting seat bookings:", error);
+      setBookingError("Failed to delete bookings");
+    }
+  };
+
+  // Handle toggling date selection in drawer
+  const handleDateToggle = (seatId: string, dateStr: string, currentlyBooked: boolean) => {
+    setDateModifications((prev) => {
+      const seatMods = prev[seatId] || {};
+      const newSeatMods = { ...seatMods };
+      
+      // Check if there's already a modification for this date
+      const hasModification = newSeatMods[dateStr] !== undefined;
+      
+      if (hasModification) {
+        // If already modified, remove the modification (revert to original state)
+        delete newSeatMods[dateStr];
+      } else {
+        // No modification yet, toggle from original state
+        if (currentlyBooked) {
+          newSeatMods[dateStr] = false; // Mark for removal
+        } else {
+          newSeatMods[dateStr] = true; // Mark for addition
+        }
+      }
+      
+      return {
+        ...prev,
+        [seatId]: newSeatMods,
+      };
+    });
+  };
+
+  // Handle saving date modifications
+  const handleUpdateBookings = async () => {
+    if (!currentUser) return;
+
+    try {
+      setIsLoadingBookings(true);
+
+      // Process all modifications
+      for (const [seatId, modifications] of Object.entries(dateModifications)) {
+        for (const [dateStr, shouldBook] of Object.entries(modifications)) {
+          if (shouldBook) {
+            // Add new booking
+            await bookingService.createBooking(
+              currentUser,
+              seatId,
+              "FULL_DAY",
+              dateStr
+            );
+          } else {
+            // Remove booking - find the booking ID first
+            const userData = await bookingService.loadUserData(currentUser);
+            const bookingToRemove = userData.userBookings.find(
+              (b: BookingRecord) => b.seatId === seatId && b.date === dateStr
+            );
+            
+            if (bookingToRemove) {
+              await bookingService.cancelBooking(bookingToRemove.id, currentUser);
+            }
+          }
+        }
+      }
+
+      // Clear modifications
+      setDateModifications({});
+
+      // Refresh user bookings
+      const refreshedData = await bookingService.loadUserData(currentUser);
+      setUserBookings(refreshedData.userBookings);
+
+      // Refresh all bookings for the current date if needed
+      if (selectedDate) {
+        const dateBookings = await bookingService.getBookingsForDate(selectedDate);
+        const bookedSeatsData = dateBookings.map((booking) => ({
+          seatId: booking.seatId,
+          userId: booking.userId,
+          timeSlot: booking.timeSlot,
+        }));
+        setAllBookingsForDate(bookedSeatsData);
+
+        // Refresh available seats
+        const reservedSeats = dateBookings.map((b) => b.seatId);
+        const seats = generateAllSeats(SEATING_CONFIG).filter(
+          (seat) => !reservedSeats.includes(seat)
+        );
+        setAvailableSeatsForDate(seats);
+      }
+
+      setIsLoadingBookings(false);
+    } catch (error) {
+      console.error("Error updating bookings:", error);
+      setBookingError("Failed to update bookings");
+      setIsLoadingBookings(false);
+    }
+  };
+
   const handleDateClick = useCallback(
     async (dateStr: string) => {
       setSelectedDate(dateStr);
@@ -682,7 +966,6 @@ export default function Home() {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          mb: 1,
           px: 2,
           py: 1,
           backgroundColor: "#fff",
@@ -722,171 +1005,371 @@ export default function Home() {
           </IconButton>
         </Box>
       </Box>
+
+      {/* First Row: Date chips - Always full width */}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "flex-start",
+          px: 3,
+          py: 1.5,
+          gap: 1.5,
+          overflowX: "auto",
+          overflowY: "hidden",
+          borderBottom: "1px solid #E5E7EB",
+          background: "#F7F8FA",
+          width: "100%",
+        }}
+      >
+        <Typography 
+          fontWeight={600}
+          fontSize="0.95rem"
+          sx={{ 
+            minWidth: "fit-content",
+            pr: 0.5,
+            color: "#1F2937",
+          }}
+        >
+          {monthYearLabel}
+        </Typography>
+        <Box
+          sx={{
+            display: "flex",
+            gap: 0.75,
+            overflowX: "auto",
+            overflowY: "hidden",
+            alignItems: "center",
+            '&::-webkit-scrollbar': {
+              height: '6px',
+            },
+            '&::-webkit-scrollbar-thumb': {
+              backgroundColor: '#CBD5E1',
+              borderRadius: '3px',
+            },
+          }}
+        >
+          {/* Today chip - always first */}
+          <Chip
+            clickable
+            label="Today"
+            sx={{
+              cursor: "pointer",
+              borderRadius: '6px',
+              backgroundColor: "primary.main",
+              color: "#fff",
+              border: 'none',
+              fontWeight: 500,
+              fontSize: '0.875rem',
+              height: '36px',
+              px: 2,
+              '& .MuiChip-label': {
+                px: 0.5,
+                py: 0,
+              },
+              '&:hover': {
+                backgroundColor: "primary.dark",
+              },
+            }}
+            onClick={() => handleDateClick(todayDate)}
+          />
+
+          {/* Date chips */}
+          {dateChips.dates.map((date) => {
+            const dateStr = formatLocalDate(date);
+            const isCurrentDate = dateStr === selectedDate;
+
+            // Check if date is in the past
+            const isPastDate =
+              !dateChips.isAfterFridayDeadline && date < dateChips.today;
+
+            // Show "Day, DD" format
+            const displayLabel = `${date.toLocaleDateString('en-US', { weekday: 'short' })}, ${String(date.getDate()).padStart(2, '0')}`;
+
+            // Determine icon based on whether user has booking for this date
+            const userBookingForDate = userBookings.find(b => b.date === dateStr);
+            const hasBooking = !!userBookingForDate;
+            const IconComponent = hasBooking ? CarIcon : HomeIcon;
+
+            const chipColor = isCurrentDate ? "#fff" : "#6B7280";
+
+            return (
+              <Chip
+                clickable={!isPastDate}
+                key={dateStr}
+                icon={<IconComponent sx={{ fontSize: '1rem', color: chipColor }} />}
+                label={displayLabel}
+                sx={{
+                  cursor: isPastDate ? "not-allowed" : "pointer",
+                  opacity: isPastDate ? 0.5 : 1,
+                  borderRadius: '6px',
+                  backgroundColor: isCurrentDate ? "primary.main" : "#E5E7EB",
+                  color: chipColor,
+                  border: 'none',
+                  fontWeight: 500,
+                  fontSize: '0.875rem',
+                  height: '36px',
+                  px: 2,
+                  '& .MuiChip-label': {
+                    px: 0,
+                    py: 0,
+                  },
+                  '& .MuiChip-icon': {
+                    marginLeft: '0px',
+                    marginRight: '6px',
+                    color: chipColor,
+                  },
+                  '&:hover': {
+                    backgroundColor: isPastDate ? undefined : (isCurrentDate ? "primary.dark" : "#D1D5DB"),
+                  },
+                }}
+                onClick={
+                  !isPastDate
+                    ? () => handleDateClick(dateStr)
+                    : undefined
+                }
+              />
+            );
+          })}
+        </Box>
+      </Box>
+
       <Box
         sx={{
           display: "flex",
           flex: 1,
           overflow: "hidden",
-          flexDirection: "column",
-          alignItems: "center",
+          flexDirection: "row",
+          alignItems: "stretch",
+          position: "relative",
         }}
       >
-        <Tabs
-          value={desktopTabValue}
-          onChange={handleDesktopTabChange}
-          aria-label="desktop navigation tabs"
-          sx={{
-            width: { xs: '100%', md: 'auto' },
-            "& .MuiTabs-indicator": {
-              display: "none",
-            },
-            pb: 2,
-            px: 2,
-          }}
-          variant="fullWidth"
-        >
-          <Tab
-            icon={<ChairIcon sx={{ fontSize: 20 }} />}
-            iconPosition="start"
-            label="List View"
-            id="desktop-tab-0"
-            aria-controls="desktop-tabpanel-0"
+        {/* Mobile Backdrop Overlay - Covers screen below navbar */}
+        {drawerOpen && (
+          <Box
+            onClick={handleDrawerToggle}
             sx={{
-              minHeight: 40,
-              textTransform: "none",
-              fontSize: "1rem",
-              color: "#6B7280",
-              backgroundColor: desktopTabValue === 0 ? "#FF5208" : "#D1D5DB",
-              borderRadius: "8px 0 0 8px",
-              px: 3,
-              py: 1,
-              whiteSpace: 'nowrap',
-              "&.Mui-selected": {
-                color: '#FFFFFF',
-              },
-              "& .MuiTab-iconWrapper": {
-                marginRight: 1,
-              },
+              display: { xs: "block", md: "none" },
+              position: "fixed",
+              top: "64px", // Start below navbar
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+              zIndex: 1299,
+              transition: "opacity 0.3s ease-in-out",
+              pointerEvents: "auto",
             }}
           />
-          <Tab
-            icon={<EventIcon sx={{ fontSize: 20 }} />}
-            iconPosition="start"
-            label="Map View"
-            id="desktop-tab-1"
-            aria-controls="desktop-tabpanel-1"
-            sx={{
-              minHeight: 40,
-              textTransform: "none",
-              fontSize: "1rem",
-              color: "#6B7280",
-              backgroundColor: desktopTabValue === 1 ? "#FF5208" : "#D1D5DB",
-              borderRadius: "0 8px 8px 0",
-              px: 3,
-              py: 1,
-              whiteSpace: 'nowrap',
-              "&.Mui-selected": {
-                color: '#FFFFFF',
-              },
-              "& .MuiTab-iconWrapper": {
-                marginRight: 1,
-              },
-            }}
-          />
-        </Tabs>
+        )}
+
+        {/* Map View - Default View */}
         <Box
-          role="tabpanel"
-          hidden={desktopTabValue !== 0}
-          id="desktop-tabpanel-0"
-          aria-labelledby="desktop-tab-0"
-          sx={{
-            flex: 1,
-            overflow: "auto",
-            p: 3,
-            display: desktopTabValue === 0 ? "flex" : "none",
-            flexDirection: "column",
-            width: "100%",
-          }}
-        >
-          {desktopTabValue === 0 && (
-            <ReservationForm
-              selectedDate={selectedDate || undefined}
-              onDateClick={handleDateClick}
-              selectedSeat={selectedSeat || undefined}
-              selectedSeatsFromClick={selectedSeatsFromClick}
-              onSubmit={handleReservation}
-              onClear={handleClearBooking}
-              onDropdownSelectionChange={handleDropdownSelectionChange}
-              currentUser={currentUser || undefined}
-              userBookings={activeUserBookings}
-              allBookingsForDate={allBookingsForDate}
-              onBookingChange={async () => {
-                // Refresh all bookings for the selected date
-                const dateToRefresh = selectedDate || todayDate;
-                const allBookings = await bookingService.getBookingsForDate(
-                  dateToRefresh
-                );
-
-                // Transform bookings to the format expected by Table component
-                const bookedSeatsData = allBookings.map((booking) => ({
-                  seatId: booking.seatId,
-                  userId: booking.userId,
-                  timeSlot: booking.timeSlot,
-                }));
-                setAllBookingsForDate(bookedSeatsData);
-
-                // Refresh user bookings
-                const userData = await bookingService.loadUserData(
-                  currentUser!
-                );
-                setUserBookings(userData.userBookings);
-                // Refresh available seats for the selected date
-                if (selectedDate) {
-                  const reservedSeats = allBookings.map((b) => b.seatId);
-                  const seats = generateAllSeats(SEATING_CONFIG).filter(
-                    (seat) => !reservedSeats.includes(seat)
-                  );
-                  setAvailableSeatsForDate(seats);
-                  // If the selected seat was just deleted, clear it
-                  const stillBooked = userData.userBookings.find(
-                    (b) => b.date === selectedDate && b.seatId === selectedSeat
-                  );
-                  if (!stillBooked) {
-                    setSelectedSeat(null);
-                  }
-                }
-              }}
-            />
-          )}
-        </Box>
-
-        <Box
-          role="tabpanel"
-          hidden={desktopTabValue !== 1}
-          id="desktop-tabpanel-1"
-          aria-labelledby="desktop-tab-1"
           sx={{
             flex: 1,
             backgroundColor: "#f8f9fa",
             overflow: "hidden",
-            display: desktopTabValue === 1 ? "block" : "none",
-            width: "100%",
+            width: drawerOpen ? { xs: 0, md: "50%" } : "100%",
+            display: drawerOpen ? { xs: "none", md: "block" } : "block",
+            transition: "width 0.3s ease-in-out",
           }}
         >
-          {desktopTabValue === 1 && (
-            <SeatingLayout
-              onSeatClick={handleSeatClick}
-              availableSeats={availableSeatsForDate}
-              selectedSeat={selectedSeat || undefined}
-              selectedSeatsFromDropdown={selectedSeatsFromDropdown}
-              seatingConfig={SEATING_CONFIG}
-              selectedDate={selectedDate || undefined}
-              onDateClick={handleDateClick}
-              bookedSeats={allBookingsForDate}
-              currentUser={currentUser || undefined}
-              timeSlot={bookingsMap[selectedDate || ""]?.timeSlot}
-              onToggleDrawer={() => { }}
-            />
+          <SeatingLayout
+            onSeatClick={handleSeatClick}
+            availableSeats={availableSeatsForDate}
+            selectedSeat={selectedSeat || undefined}
+            selectedSeatsFromDropdown={selectedSeatsFromDropdown}
+            seatingConfig={SEATING_CONFIG}
+            selectedDate={selectedDate || undefined}
+            bookedSeats={allBookingsForDate}
+            currentUser={currentUser || undefined}
+            timeSlot={bookingsMap[selectedDate || ""]?.timeSlot}
+            onToggleDrawer={handleDrawerToggle}
+            drawerOpen={drawerOpen}
+            isWeekend={selectedDate ? isDateWeekend(selectedDate) : false}
+          />
+        </Box>
+
+        {/* Drawer for List View - Side by Side */}
+        <Box
+          sx={{
+            width: { xs: "100%", md: drawerOpen ? "50%" : 0 },
+            maxWidth: { xs: "100%", md: drawerOpen ? "600px" : 0 },
+            overflow: "hidden",
+            transition: {
+              xs: "transform 0.3s ease-in-out",
+              md: "width 0.3s ease-in-out, max-width 0.3s ease-in-out",
+            },
+            borderLeft: drawerOpen ? { xs: "none", md: "1px solid #CDCFD0" } : "none",
+            backgroundColor: "#fff",
+            display: { xs: "flex", md: "flex" },
+            flexDirection: "column",
+            position: { xs: "fixed", md: "relative" },
+            top: { xs: "64px", md: "auto" }, // Start below navbar (approximate navbar height)
+            bottom: { xs: 0, md: "auto" },
+            left: { xs: 0, md: "auto" },
+            right: { xs: 0, md: "auto" },
+            height: { xs: "calc(100vh - 64px)", md: "auto" }, // Full height minus navbar
+            zIndex: { xs: 1300, md: "auto" },
+            transform: {
+              xs: drawerOpen ? "translateY(0)" : "translateY(100%)",
+              md: "none",
+            },
+            pointerEvents: { xs: drawerOpen ? "auto" : "none", md: "auto" },
+          }}
+        >
+          {drawerOpen && (
+            <>
+              {/* Drawer Navbar */}
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  position: "relative",
+                  px: 2,
+                  py: 1.25,
+                  backgroundColor: "#FF6B35",
+                  color: "#fff",
+                  minHeight: "56px",
+                }}
+              >
+                <IconButton
+                  onClick={handleDrawerToggle}
+                  sx={{
+                    position: "absolute",
+                    left: 8,
+                    color: "#fff",
+                    "&:hover": {
+                      backgroundColor: "rgba(255,255,255,0.1)",
+                    },
+                  }}
+                >
+                  <MenuIcon />
+                </IconButton>
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: 600,
+                    fontSize: "1rem",
+                  }}
+                >
+                  My Booked List
+                </Typography>
+              </Box>
+
+              {/* Drawer Content */}
+              <Box
+                sx={{
+                  flex: 1,
+                  overflow: "auto",
+                  p: 3,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 2,
+                }}
+              >
+                {/* Group bookings by seat */}
+                {Object.entries(
+                  userBookings.reduce((acc, booking) => {
+                    if (!acc[booking.seatId]) {
+                      acc[booking.seatId] = [];
+                    }
+                    acc[booking.seatId].push(booking.date);
+                    return acc;
+                  }, {} as Record<string, string[]>)
+                ).map(([seatId, bookedDates]) => {
+                  // Extract table letter from seatId (e.g., "A1" -> "A")
+                  const tableLetter = seatId.charAt(0);
+                  
+                  // Determine zone based on table letter
+                  const zone = SEATING_CONFIG.zones.zone1.tables.includes(tableLetter) 
+                    ? "A" 
+                    : "B";
+
+                  return (
+                    <BookedSeatItem
+                      key={seatId}
+                      seatId={seatId}
+                      zone={zone}
+                      bookedDates={bookedDates}
+                      allDates={dateChips.dates}
+                      onDelete={() => handleDeleteSeatBookings(seatId)}
+                      onDateToggle={(dateStr, currentlyBooked) => 
+                        handleDateToggle(seatId, dateStr, currentlyBooked)
+                      }
+                      modifiedDates={dateModifications[seatId] || {}}
+                      disabledDates={otherUsersBookings[seatId] || []}
+                    />
+                  );
+                })}
+
+                {userBookings.length === 0 && (
+                  <Box
+                    sx={{
+                      textAlign: "center",
+                      py: 8,
+                      color: "#6B7280",
+                    }}
+                  >
+                    <Typography variant="body1">
+                      No bookings yet
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+
+              {/* Drawer Footer with Buttons */}
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  gap: 2,
+                  p: 2,
+                  backgroundColor: "#fff",
+                }}
+              >
+                <Button
+                  variant="contained"
+                  onClick={handleDrawerToggle}
+                  sx={{
+                    textTransform: "none",
+                    px: 4,
+                    py: 1,
+                    backgroundColor: "#E5E7EB",
+                    color: "#374151",
+                    boxShadow: "none",
+                    "&:hover": {
+                      backgroundColor: "#D1D5DB",
+                      boxShadow: "none",
+                    },
+                  }}
+                >
+                  Close
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={handleUpdateBookings}
+                  disabled={Object.keys(dateModifications).length === 0 || isLoadingBookings}
+                  sx={{
+                    textTransform: "none",
+                    px: 4,
+                    py: 1,
+                    backgroundColor: "#FF6B35",
+                    "&:hover": {
+                      backgroundColor: "#E55A2B",
+                    },
+                    "&:disabled": {
+                      backgroundColor: "#D1D5DB",
+                      color: "#9CA3AF",
+                    },
+                  }}
+                >
+                  {isLoadingBookings ? "Updating..." : "Update"}
+                </Button>
+              </Box>
+            </>
           )}
         </Box>
       </Box>

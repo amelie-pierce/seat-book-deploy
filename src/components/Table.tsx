@@ -19,6 +19,7 @@ interface TableProps {
   }>;
   seatsCount?: number; // Optional prop to specify number of seats (6 or 8)
   rotated?: boolean; // Optional prop to rotate table 90 degrees (for Zone B)
+  isWeekend?: boolean; // Flag to disable all seats on weekends
 }
 
 function Table({
@@ -31,7 +32,8 @@ function Table({
   currentUser,
   bookedSeats = [],
   seatsCount,
-  rotated = false
+  rotated = false,
+  isWeekend = false,
 }: TableProps) {
   // Determine the number of seats for this table
   // Zone A: Tables B, E, H (2nd column) have 6 seats, others have 8 seats
@@ -461,6 +463,7 @@ function Table({
                 timeSlots={getTimeSlotStatus(seatNumber)}
                 bookedByUser={getBookedByUser(seatNumber)}
                 bookedByUsers={getBookedByUsers(seatNumber)}
+                isWeekend={isWeekend}
               />
             );
           })}
@@ -482,6 +485,7 @@ function Table({
                 timeSlots={getTimeSlotStatus(seatNumber)}
                 bookedByUser={getBookedByUser(seatNumber)}
                 bookedByUsers={getBookedByUsers(seatNumber)}
+                isWeekend={isWeekend}
               />
             );
           })}
@@ -506,6 +510,7 @@ function Table({
                 timeSlots={getTimeSlotStatus(seatNumber)}
                 bookedByUser={getBookedByUser(seatNumber)}
                 bookedByUsers={getBookedByUsers(seatNumber)}
+                isWeekend={isWeekend}
               />
             );
           })}
@@ -527,6 +532,7 @@ function Table({
                 timeSlots={getTimeSlotStatus(seatNumber)}
                 bookedByUser={getBookedByUser(seatNumber)}
                 bookedByUsers={getBookedByUsers(seatNumber)}
+                isWeekend={isWeekend}
               />
             );
           })}

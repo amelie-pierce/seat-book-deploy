@@ -31,6 +31,7 @@ interface SeatButtonProps {
     pmIsCurrentUser?: boolean;
     timeSlot?: "AM" | "PM" | "FULL_DAY";
   };
+  isWeekend?: boolean; // Flag to disable seat on weekends
 }
 
 function SeatButton({
@@ -50,11 +51,15 @@ function SeatButton({
     amIsCurrentUser: false,
     pmIsCurrentUser: false,
   },
+  isWeekend = false,
 }: SeatButtonProps) {
   const [isHovered, setIsHovered] = useState(false);
   
   // Check if the seat is booked (either AM, PM, or FULL_DAY)
   const isBooked = timeSlots.am || timeSlots.pm;
+  
+  // Disable seat if it's weekend
+  const isDisabled = isWeekend;
   
   // Check if seat is booked by two different users (one for AM, one for PM)
   const hasTwoUsers = bookedByUsers && bookedByUsers.am && bookedByUsers.pm && bookedByUsers.am !== bookedByUsers.pm;
@@ -66,9 +71,10 @@ function SeatButton({
   return (
     <IconButton
       data-seat-id={seatId}
-      onClick={onClick}
+      onClick={isDisabled ? undefined : onClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      disabled={isDisabled}
       sx={{
         position: "absolute",
         ...(position === "top" || position === "bottom" 
@@ -88,9 +94,15 @@ function SeatButton({
         padding: 0,
         overflow: "hidden",
         // border: `2px solid #CDCFD0`,
-        backgroundColor: isBooked ? 'primary.main' : '#61BF76',
+        backgroundColor: isDisabled ? '#D1D5DB' : (isBooked ? 'primary.main' : '#61BF76'),
+        opacity: isDisabled ? 0.5 : 1,
+        cursor: isDisabled ? 'not-allowed' : 'pointer',
         "&:hover": {
-          backgroundColor: '#FF5208',
+          backgroundColor: isDisabled ? '#D1D5DB' : '#FF5208',
+        },
+        "&.Mui-disabled": {
+          backgroundColor: '#D1D5DB',
+          opacity: 0.5,
         },
       }}
         // disabled={!isAvailable && !timeSlots.isCurrentUser}
