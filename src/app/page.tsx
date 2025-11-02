@@ -233,6 +233,11 @@ export default function Home() {
   const [tempSeats, setTempSeats] = useState<string[]>([]);
   const [showAddSeatDropdown, setShowAddSeatDropdown] = useState(false);
 
+  // Track all seats' bookings to determine which are fully booked
+  const [allSeatsBookings, setAllSeatsBookings] = useState<{
+    [seatId: string]: string[];
+  }>({});
+
   // Memoize filtered userBookings to prevent infinite loops in ReservationForm
   const activeUserBookings = useMemo(() => {
     return userBookings
@@ -381,17 +386,26 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser]);
 
-  // Load other users' bookings for seats that the current user has booked
+  // Load other users' bookings for seats that the current user has booked or is trying to book (temp seats)
   useEffect(() => {
     const loadOtherUsersBookings = async () => {
-      if (!currentUser || userBookings.length === 0) {
+      if (!currentUser) {
         setOtherUsersBookings({});
         return;
       }
 
       try {
-        // Get unique seat IDs from user's bookings
-        const userSeatIds = [...new Set(userBookings.map(b => b.seatId))];
+        // Get unique seat IDs from user's bookings AND temp seats
+        const userSeatIds = [...new Set([
+          ...userBookings.map(b => b.seatId),
+          ...tempSeats
+        ])];
+        
+        if (userSeatIds.length === 0) {
+          setOtherUsersBookings({});
+          return;
+        }
+
         const otherBookings: { [seatId: string]: string[] } = {};
 
         // For each seat, get all bookings and filter for other users
@@ -428,7 +442,53 @@ export default function Home() {
     };
 
     loadOtherUsersBookings();
-  }, [currentUser, userBookings, dateChips.dates]);
+  }, [currentUser, userBookings, dateChips.dates, tempSeats]);
+
+  // Load all seats' bookings when dropdown is opened
+  useEffect(() => {
+    const loadAllSeatsBookings = async () => {
+      if (!showAddSeatDropdown || !currentUser) {
+        return;
+      }
+
+      try {
+        const allSeats = generateAllSeats(SEATING_CONFIG);
+        const allBookings: { [seatId: string]: string[] } = {};
+
+        // Get all available dates
+        const datesToCheck = dateChips.dates.map(date => {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        });
+
+        // For each seat, check which dates are booked
+        for (const seatId of allSeats) {
+          const bookedDates: string[] = [];
+
+          for (const dateStr of datesToCheck) {
+            const dateBookings = await bookingService.getBookingsForDate(dateStr);
+            const hasBooking = dateBookings.some(
+              b => b.seatId === seatId && b.status === 'ACTIVE'
+            );
+            
+            if (hasBooking) {
+              bookedDates.push(dateStr);
+            }
+          }
+
+          allBookings[seatId] = bookedDates;
+        }
+
+        setAllSeatsBookings(allBookings);
+      } catch (error) {
+        console.error("Error loading all seats' bookings:", error);
+      }
+    };
+
+    loadAllSeatsBookings();
+  }, [showAddSeatDropdown, currentUser, dateChips.dates]);
 
   const handleSeatClick = (seatId: string, event?: React.MouseEvent<HTMLButtonElement>) => {
     // Check seat availability using the new logic
@@ -809,14 +869,38 @@ export default function Home() {
   };
 
   // Get available seats that aren't already in user's booking list or temp seats
+  // Also filter out seats that are fully booked by others for all dates
   const getAvailableSeatsForDropdown = () => {
     const allSeats = generateAllSeats(SEATING_CONFIG);
     const userSeatIds = [...new Set(userBookings.map(b => b.seatId))];
     
-    // Filter out seats that are already in user's bookings or temp seats
-    return allSeats.filter(seatId => 
-      !userSeatIds.includes(seatId) && !tempSeats.includes(seatId)
-    );
+    // Get all available dates (working days)
+    const allAvailableDates = dateChips.dates.map(date => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    });
+    
+    // Filter out seats that are:
+    // 1. Already in user's bookings
+    // 2. Already in temp seats
+    // 3. Fully booked for ALL available dates
+    return allSeats.filter(seatId => {
+      // Check if already in user's list
+      if (userSeatIds.includes(seatId) || tempSeats.includes(seatId)) {
+        return false;
+      }
+      
+      // Check if seat is fully booked for all dates
+      const seatBookedDates = allSeatsBookings[seatId] || [];
+      
+      // If the seat has bookings for ALL available dates, exclude it
+      const isFullyBooked = allAvailableDates.length > 0 && 
+                           allAvailableDates.every(date => seatBookedDates.includes(date));
+      
+      return !isFullyBooked;
+    });
   };
 
   // Handle adding a temporary seat
