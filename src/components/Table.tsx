@@ -51,11 +51,12 @@ function Table({
   }
 
   // Define seat positions based on number of seats per side
+  // These positions align with the dividing lines on the table
   const seatPositions = seatsPerSide === 2 
-    ? ['30%', '70%'] 
+    ? ['25%', '75%'] 
     : seatsPerSide === 3 
-    ? ['20%', '50%', '80%'] 
-    : ['15%', '38%', '62%', '85%'];
+    ? ['16.6667%', '50%', '83.3333%'] 
+    : ['12.5%', '37.5%', '62.5%', '87.5%'];
 
   // Memoize seat availability calculations to avoid recalculating on every render
   const seatAvailabilityMap = useMemo(() => {
