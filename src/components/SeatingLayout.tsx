@@ -1,7 +1,7 @@
 import { Box, IconButton, Tooltip, Typography, Button } from "@mui/material";
 import { ZoomIn, ZoomOut, CenterFocusStrong, FormatListBulleted } from "@mui/icons-material";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useEffect, useState } from "react";
 import Image from "next/image";
 import Table from "./Table";
 import ZoneButton from "./ZoneButton";
@@ -42,6 +42,7 @@ export default function SeatingLayout({
 }: SeatingLayoutProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const transformRef = useRef<any>(null);
+  const [isMapCentered, setIsMapCentered] = useState(false);
 
   // Memoize zone-based table organization
   const zoneOrganization = useMemo(() => {
@@ -69,12 +70,33 @@ export default function SeatingLayout({
   }, [seatingConfig.zones]);
 
   // Handle zone focus (zoom/center only, no highlighting)
-  const handleZoneFocus = (zone: "zone1" | "zone2" | "meeting", zoomToElement: (element: HTMLElement, scale: number, duration: number) => void) => {
+  const handleZoneFocus = (zone: "zone1" | "zone2" | "fullmap", zoomToElement: (element: HTMLElement, scale: number, duration: number) => void) => {
     const seatElement = document.getElementById(`seating-${zone}`);
     if (seatElement) {
-      zoomToElement(seatElement as HTMLElement, 0.5, 500);
+      // Different scales for different views
+      let scale = 0.5;
+      if (zone === "fullmap") {
+        scale = 0.4; // Show entire map
+      } else if (zone === "zone1" || zone === "zone2") {
+        scale = 0.65; // Zoom into specific zone
+      }
+      zoomToElement(seatElement as HTMLElement, scale, 500);
     }
   };
+
+  // Center the map on initial load to match Full Map view
+  useEffect(() => {
+    if (transformRef.current) {
+      const timer = setTimeout(() => {
+        const fullMapElement = document.getElementById("seating-fullmap");
+        if (fullMapElement && transformRef.current?.zoomToElement) {
+          transformRef.current.zoomToElement(fullMapElement, 0.4, 0);
+          setIsMapCentered(true);
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   // Compute the effective selected seat - prioritize user's booked seat for current date
   const effectiveSelectedSeat = useMemo(() => {
@@ -105,6 +127,7 @@ export default function SeatingLayout({
         alignItems: "center",
         height: "100%",
         width: "100%",
+        position: "relative",
       }}
     >
       {/* Zoomable tables section */}
@@ -122,9 +145,12 @@ export default function SeatingLayout({
       >
         <TransformWrapper
           ref={transformRef}
-          initialScale={0.5}
+          initialScale={0.4}
           minScale={0.2}
           maxScale={3}
+          centerOnInit={true}
+          centerZoomedOut={true}
+          alignmentAnimation={{ disabled: false }}
           wheel={{
             step: 0.1,
           }}
@@ -175,7 +201,7 @@ export default function SeatingLayout({
                   />
                   <ZoneButton
                     label="Full Map"
-                    onClick={() => handleZoneFocus("meeting", zoomToElement)}
+                    onClick={() => handleZoneFocus("fullmap", zoomToElement)}
                   />
                 </Box>
                 
@@ -309,13 +335,14 @@ export default function SeatingLayout({
                   width: "100%",
                   height: "100%",
                   display: "flex",
-                  justifyContent: "flex-start",
-                  alignItems: "flex-start",
-                  paddingTop: "200px",
-                  paddingLeft: "30px",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  opacity: isMapCentered ? 1 : 0,
+                  transition: "opacity 0.2s ease-in",
                 }}
               >
                 <Box
+                  id="seating-fullmap"
                   sx={{
                     display: "flex",
                     gap: 6,
