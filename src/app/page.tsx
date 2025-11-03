@@ -913,10 +913,10 @@ export default function Home() {
           <Image 
             src="/logo.png" 
             alt="Flexi Seat Logo" 
-            width={32}
-            height={32}
+            width={25}
+            height={25}
           />
-          <Typography variant="h5" component="h3" color="#000000">
+          <Typography variant="h5" component="h3" color="#000000" fontWeight={600}>
             Flexi Seat
           </Typography>
         </Box>

@@ -43,10 +43,10 @@ function SeatButton({
   isWeekend = false,
 }: SeatButtonProps) {
   const [isHovered, setIsHovered] = useState(false);
-  
+
   // Check if the seat is booked (full day only)
   const isBooked = !!bookedByUser;
-  
+
   // Check if booked by current user
   const isBookedByCurrentUser = bookedByUser === currentUser;
 
@@ -73,17 +73,17 @@ function SeatButton({
       disabled={isDisabled}
       sx={{
         position: "absolute",
-        ...(position === "top" || position === "bottom" 
+        ...(position === "top" || position === "bottom"
           ? {
-              [position]: -25,
-              left: leftPosition,
-              transform: "translateX(-50%)",
-            }
+            [position]: -25,
+            left: leftPosition,
+            transform: "translateX(-50%)",
+          }
           : {
-              [position]: -25,
-              top: leftPosition,
-              transform: "translateY(-50%)",
-            }
+            [position]: -25,
+            top: leftPosition,
+            transform: "translateY(-50%)",
+          }
         ),
         width: 50,
         height: 50,
@@ -93,6 +93,14 @@ function SeatButton({
         backgroundColor: isDisabled ? '#D1D5DB' : (isBooked ? (isBookedByCurrentUser ? '#F5A623' : '#CDCFD0') : '#61BF76'),
         opacity: isDisabled ? 0.5 : 1,
         cursor: isDisabled ? 'not-allowed' : 'pointer',
+        ...(isBookedByCurrentUser && {
+          boxShadow: `
+                0 0 10px 8px rgba(245, 166, 35, 0.6),
+                0 0 40px 15px rgba(245, 166, 35, 0.4),
+                0 0 60px 20px rgba(245, 166, 35, 0.2)
+              `,
+          border: '2px solid rgba(245, 166, 35, 0.8)',
+        }),
         "&:hover": {
           backgroundColor: isDisabled ? '#D1D5DB' : '#FF5208',
         },
@@ -101,7 +109,7 @@ function SeatButton({
           opacity: 0.5,
         },
       }}
-        // disabled={!isAvailable && !timeSlots.isCurrentUser}
+    // disabled={!isAvailable && !timeSlots.isCurrentUser}
     >
       {isBooked && bookedByUser ? (
         // Show full avatar for full-day booking

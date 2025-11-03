@@ -372,7 +372,6 @@ export default function SeatingLayout({
                       paddingX: 3,
                       paddingY: 5,
                       borderRadius: 2,
-                      border: "2px solid #e3f2fd",
                     }}
                   >
                     <Box
