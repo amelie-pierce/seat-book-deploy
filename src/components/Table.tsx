@@ -1,4 +1,4 @@
-import { Box, Paper, Typography } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import { useMemo, useCallback } from 'react';
 import React from 'react';
 import SeatButton from './SeatButton';
@@ -10,12 +10,10 @@ interface TableProps {
   tableLetter: string;
   availableSeats?: string[];
   selectedSeat?: string;
-  timeSlot?: 'AM' | 'PM' | 'FULL_DAY';
   currentUser?: string;
   bookedSeats?: Array<{
     seatId: string;
     userId: string;
-    timeSlot: 'AM' | 'PM' | 'FULL_DAY';
   }>;
   seatsCount?: number; // Optional prop to specify number of seats (6 or 8)
   rotated?: boolean; // Optional prop to rotate table 90 degrees (for Zone B)
@@ -28,7 +26,6 @@ function Table({
   onSeatClick,
   tableLetter,
   selectedSeat,
-  timeSlot,
   currentUser,
   bookedSeats = [],
   seatsCount,
@@ -71,79 +68,14 @@ function Table({
       // If no bookings, seat is available
       if (seatBookings.length === 0) {
         availabilityMap.set(seatNumber, true);
-        continue;
-      }
-
-      // Check for FULL_DAY bookings - if any exist, seat is not available
-      const hasFullDayBooking = seatBookings.some(booking => booking.timeSlot === 'FULL_DAY');
-      if (hasFullDayBooking) {
-        availabilityMap.set(seatNumber, false);
-        continue;
-      }
-
-      // Check if both AM and PM are booked by different users
-      const amBooking = seatBookings.find(booking => booking.timeSlot === 'AM');
-      const pmBooking = seatBookings.find(booking => booking.timeSlot === 'PM');
-
-      if (amBooking && pmBooking && amBooking.userId !== pmBooking.userId) {
-        // Both AM and PM booked by different users - not available
-        availabilityMap.set(seatNumber, false);
       } else {
-        // If only AM or only PM is booked, or both are booked by same user, seat is still available
-        availabilityMap.set(seatNumber, true);
+        // Seat is booked (FULL_DAY only)
+        availabilityMap.set(seatNumber, false);
       }
     }
 
     return availabilityMap;
   }, [tableLetter, bookedSeats, totalSeats]);
-
-  // Memoize time slot status calculations
-  const timeSlotStatusMap = useMemo(() => {
-    const statusMap = new Map<number, {
-      amBooked: boolean;
-      pmBooked: boolean;
-      amIsCurrentUser: boolean;
-      pmIsCurrentUser: boolean;
-    }>();
-
-    for (let seatNumber = 1; seatNumber <= totalSeats; seatNumber++) {
-      const seatId = `${tableLetter}${seatNumber}`;
-      const seatBookings = bookedSeats.filter(b => b.seatId === seatId);
-
-      // Initialize status
-      let amBooked = false;
-      let pmBooked = false;
-      let amIsCurrentUser = false;
-      let pmIsCurrentUser = false;
-
-      // Check each booking for this seat
-      seatBookings.forEach(booking => {
-        const isCurrentUserBooking = booking.userId === currentUser;
-
-        if (booking.timeSlot === 'FULL_DAY') {
-          amBooked = true;
-          pmBooked = true;
-          amIsCurrentUser = isCurrentUserBooking;
-          pmIsCurrentUser = isCurrentUserBooking;
-        } else if (booking.timeSlot === 'AM') {
-          amBooked = true;
-          amIsCurrentUser = isCurrentUserBooking;
-        } else if (booking.timeSlot === 'PM') {
-          pmBooked = true;
-          pmIsCurrentUser = isCurrentUserBooking;
-        }
-      });
-
-      statusMap.set(seatNumber, {
-        amBooked,
-        pmBooked,
-        amIsCurrentUser,
-        pmIsCurrentUser
-      });
-    }
-
-    return statusMap;
-  }, [tableLetter, bookedSeats, currentUser, totalSeats]);
 
   const handleSeatClick = useCallback((seatNumber: number, event?: React.MouseEvent<HTMLButtonElement>) => {
     const seatId = `${tableLetter}${seatNumber}`;
@@ -161,61 +93,16 @@ function Table({
     return selectedSeat === seatId;
   }, [tableLetter, selectedSeat]);
 
-  const getTimeSlotStatus = useCallback((seatNumber: number) => {
-    const status = timeSlotStatusMap.get(seatNumber);
-    const seatId = `${tableLetter}${seatNumber}`;
-    
-    if (!status) {
-      return {
-        am: false,
-        pm: false,
-        isCurrentUser: false,
-        amIsCurrentUser: false,
-        pmIsCurrentUser: false,
-        timeSlot: selectedSeat === seatId ? timeSlot : undefined
-      };
-    }
-    
-    return {
-      am: status.amBooked,
-      pm: status.pmBooked,
-      isCurrentUser: status.amIsCurrentUser || status.pmIsCurrentUser, // For overall seat border
-      amIsCurrentUser: status.amIsCurrentUser, // For AM time slot color
-      pmIsCurrentUser: status.pmIsCurrentUser, // For PM time slot color
-      timeSlot: selectedSeat === seatId ? timeSlot : undefined
-    };
-  }, [timeSlotStatusMap, tableLetter, selectedSeat, timeSlot]);
-
   const getBookedByUser = useCallback((seatNumber: number) => {
     const seatId = `${tableLetter}${seatNumber}`;
-    const seatBookings = bookedSeats.filter(b => b.seatId === seatId);
+    const seatBooking = bookedSeats.find(b => b.seatId === seatId);
     
-    // Return the first user who booked this seat (for display purposes)
-    if (seatBookings.length > 0) {
-      return seatBookings[0].userId;
+    // Return the user who booked this seat (for display purposes)
+    if (seatBooking) {
+      return seatBooking.userId;
     }
     
     return undefined;
-  }, [tableLetter, bookedSeats]);
-
-  const getBookedByUsers = useCallback((seatNumber: number) => {
-    const seatId = `${tableLetter}${seatNumber}`;
-    const seatBookings = bookedSeats.filter(b => b.seatId === seatId);
-    
-    const result: { am?: string; pm?: string } = {};
-    
-    seatBookings.forEach(booking => {
-      if (booking.timeSlot === "AM") {
-        result.am = booking.userId;
-      } else if (booking.timeSlot === "PM") {
-        result.pm = booking.userId;
-      } else if (booking.timeSlot === "FULL_DAY") {
-        result.am = booking.userId;
-        result.pm = booking.userId;
-      }
-    });
-    
-    return result;
   }, [tableLetter, bookedSeats]);  return (
     <Box sx={{ position: 'relative' }}>
       <Box
@@ -461,9 +348,8 @@ function Table({
                 selected={isSeatSelected(seatNumber)}
                 seatNumber={seatNumber}
                 seatId={seatId}
-                timeSlots={getTimeSlotStatus(seatNumber)}
                 bookedByUser={getBookedByUser(seatNumber)}
-                bookedByUsers={getBookedByUsers(seatNumber)}
+                currentUser={currentUser}
                 isWeekend={isWeekend}
               />
             );
@@ -483,9 +369,8 @@ function Table({
                 selected={isSeatSelected(seatNumber)}
                 seatNumber={seatNumber}
                 seatId={seatId}
-                timeSlots={getTimeSlotStatus(seatNumber)}
                 bookedByUser={getBookedByUser(seatNumber)}
-                bookedByUsers={getBookedByUsers(seatNumber)}
+                currentUser={currentUser}
                 isWeekend={isWeekend}
               />
             );
@@ -508,9 +393,8 @@ function Table({
                 selected={isSeatSelected(seatNumber)}
                 seatNumber={seatNumber}
                 seatId={seatId}
-                timeSlots={getTimeSlotStatus(seatNumber)}
                 bookedByUser={getBookedByUser(seatNumber)}
-                bookedByUsers={getBookedByUsers(seatNumber)}
+                currentUser={currentUser}
                 isWeekend={isWeekend}
               />
             );
@@ -530,9 +414,8 @@ function Table({
                 selected={isSeatSelected(seatNumber)}
                 seatNumber={seatNumber}
                 seatId={seatId}
-                timeSlots={getTimeSlotStatus(seatNumber)}
                 bookedByUser={getBookedByUser(seatNumber)}
-                bookedByUsers={getBookedByUsers(seatNumber)}
+                currentUser={currentUser}
                 isWeekend={isWeekend}
               />
             );

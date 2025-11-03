@@ -2,8 +2,8 @@
 // This service works with CSV files and only stores user ID in localStorage
 // All booking data is read from CSV files and kept in memory cache
 
-import { 
-  BookingRecord, 
+import {
+  BookingRecord,
   generateBookingId,
   hasUserBookingForDate,
   getUserBookingForDate,
@@ -21,17 +21,17 @@ export class BookingService {
     if (this.isInitialized) {
       return;
     }
-    
+
     try {
-      
+
       // Initialize Vercel data service (will only make API call if not already initialized)
       await vercelDataService.initialize();
-      
+
       // Load reservations from Vercel data service and convert to bookings
       // This will NOT make additional API calls since service is now initialized
       const reservationBookings = await vercelDataService.getBookingsFromReservations();
       this.cachedBookings = reservationBookings;
-      
+
       this.isInitialized = true;
     } catch (error) {
       console.error('❌ Error initializing database:', error);
@@ -42,13 +42,13 @@ export class BookingService {
 
   // Refresh data from API
   async refreshFromCsv(): Promise<void> {
-    
+
     // Make sure we're initialized first, but don't force a refresh if we just initialized
     if (!this.isInitialized) {
       await this.initializeDatabase();
       return;
     }
-    
+
     // Force refresh data from API only if we're already initialized
     await vercelDataService.refreshFromApi();
     // Get fresh bookings (no need to re-initialize since refreshFromApi already loaded fresh data)
@@ -68,13 +68,13 @@ export class BookingService {
     totalBookings: number;
   }> {
     await this.initializeDatabase();
-    
-    const userBookings = this.cachedBookings.filter(b => 
-      b.userId === userId && 
+
+    const userBookings = this.cachedBookings.filter(b =>
+      b.userId === userId &&
       b.status === 'ACTIVE'
     );
     const todayBooking = getUserBookingForDate(this.cachedBookings, userId, getTodayDate());
-    
+
     return {
       userBookings,
       todayBooking,
@@ -88,7 +88,7 @@ export class BookingService {
     bookings: Array<{ seatId: string; timeSlot: 'AM' | 'PM' | 'FULL_DAY'; date: string }>
   ): Promise<{ success: boolean; bookings?: BookingRecord[]; error?: string; failedBookings?: string[] }> {
     await this.initializeDatabase();
-    
+
     try {
       const createdBookings: BookingRecord[] = [];
       const failedBookings: string[] = [];
@@ -104,9 +104,9 @@ export class BookingService {
         }
 
         // Check if seat is already booked for this date and time
-        const existingBooking = this.cachedBookings.find((b: BookingRecord) => 
-          b.seatId === seatId && 
-          b.date === date && 
+        const existingBooking = this.cachedBookings.find((b: BookingRecord) =>
+          b.seatId === seatId &&
+          b.date === date &&
           b.status === 'ACTIVE' && (
             timeSlot === 'FULL_DAY' || // If requesting full day, check any existing booking
             b.timeSlot === 'FULL_DAY' || // If existing booking is full day, conflict with any request
@@ -136,8 +136,8 @@ export class BookingService {
 
       // If there are validation failures, return them
       if (failedBookings.length > 0 && createdBookings.length === 0) {
-        return { 
-          success: false, 
+        return {
+          success: false,
           error: failedBookings.join('; '),
           failedBookings
         };
@@ -145,23 +145,23 @@ export class BookingService {
 
       // Save all valid bookings with individual conflict detection
       const successfulBookings: BookingRecord[] = [];
-      
+
       for (const booking of createdBookings) {
         try {
           // Add to cache optimistically
           this.cachedBookings.push(booking);
-          
+
           // Save to API with conflict detection
           await vercelDataService.saveBookingAsReservation(booking);
           successfulBookings.push(booking);
-          
+
         } catch (error) {
           // Remove from cache if save failed
           const index = this.cachedBookings.indexOf(booking);
           if (index > -1) {
             this.cachedBookings.splice(index, 1);
           }
-          
+
           // Handle seat conflict
           if (error instanceof SeatConflictError) {
             failedBookings.push(`Seat ${booking.seatId} on ${booking.date}: Already booked by another user`);
@@ -174,12 +174,12 @@ export class BookingService {
       const hasSuccess = successfulBookings.length > 0;
       const hasFailures = failedBookings.length > 0;
 
-      return { 
+      return {
         success: hasSuccess,
         bookings: successfulBookings,
-        ...(hasFailures && { 
+        ...(hasFailures && {
           error: `Some bookings failed: ${failedBookings.join('; ')}`,
-          failedBookings 
+          failedBookings
         })
       };
     } catch (error) {
@@ -190,13 +190,13 @@ export class BookingService {
 
   // Create a new booking and immediately save to CSV
   async createBooking(
-    userId: string, 
-    seatId: string, 
+    userId: string,
+    seatId: string,
     timeSlot: 'AM' | 'PM' | 'FULL_DAY',
     date?: string
   ): Promise<{ success: boolean; booking?: BookingRecord; error?: string }> {
     await this.initializeDatabase();
-    
+
     try {
       const bookingDate = date || getTodayDate();
 
@@ -209,9 +209,9 @@ export class BookingService {
       }
 
       // Check if seat is already booked for this date and time
-      const existingBooking = this.cachedBookings.find((b: BookingRecord) => 
-        b.seatId === seatId && 
-        b.date === bookingDate && 
+      const existingBooking = this.cachedBookings.find((b: BookingRecord) =>
+        b.seatId === seatId &&
+        b.date === bookingDate &&
         b.status === 'ACTIVE' && (
           timeSlot === 'FULL_DAY' || // If requesting full day, check any existing booking
           b.timeSlot === 'FULL_DAY' || // If existing booking is full day, conflict with any request
@@ -244,7 +244,7 @@ export class BookingService {
         await vercelDataService.saveBookingAsReservation(newBooking);
 
         return { success: true, booking: newBooking };
-        
+
       } catch (saveError) {
         // Remove from cache if save failed
         const index = this.cachedBookings.indexOf(newBooking);
@@ -255,8 +255,8 @@ export class BookingService {
         // Handle specific seat conflict error
         if (saveError instanceof SeatConflictError) {
           console.error('⚠️ Seat booking conflict detected:', saveError.message);
-          return { 
-            success: false, 
+          return {
+            success: false,
             error: `Seat already taken! ${saveError.message}. Please refresh and choose another seat.`
           };
         }
@@ -267,8 +267,8 @@ export class BookingService {
       // Handle specific seat conflict error
       if (error instanceof SeatConflictError) {
         console.error('⚠️ Seat booking conflict detected:', error.message);
-        return { 
-          success: false, 
+        return {
+          success: false,
           error: `Seat already taken! ${error.message}. Please refresh and choose another seat.`
         };
       }
@@ -282,9 +282,9 @@ export class BookingService {
   // Cancel a booking and update CSV
   async cancelBooking(bookingId: string, userId: string): Promise<{ success: boolean; error?: string }> {
     await this.initializeDatabase();
-    
+
     try {
-      const bookingIndex = this.cachedBookings.findIndex((b: BookingRecord) => 
+      const bookingIndex = this.cachedBookings.findIndex((b: BookingRecord) =>
         b.id === bookingId && b.userId === userId
       );
 
@@ -329,7 +329,7 @@ export class BookingService {
   // Get bookings for a specific date
   async getBookingsForDate(date: string): Promise<BookingRecord[]> {
     await this.initializeDatabase();
-    return this.cachedBookings.filter(booking => 
+    return this.cachedBookings.filter(booking =>
       booking.date === date && booking.status === 'ACTIVE'
     );
   }
@@ -343,7 +343,7 @@ export class BookingService {
   }> {
     await this.initializeDatabase();
     const today = getTodayDate();
-    
+
     return {
       totalBookings: this.cachedBookings.length,
       activeBookings: this.cachedBookings.filter((b: BookingRecord) => b.status === 'ACTIVE').length,

@@ -17,10 +17,8 @@ interface SeatingLayoutProps {
   bookedSeats?: Array<{
     seatId: string;
     userId: string;
-    timeSlot: "AM" | "PM" | "FULL_DAY";
   }>;
   currentUser?: string;
-  timeSlot?: "AM" | "PM" | "FULL_DAY";
   onToggleDrawer?: () => void;
   drawerOpen?: boolean;
   isWeekend?: boolean;
@@ -35,7 +33,6 @@ export default function SeatingLayout({
   selectedDate,
   bookedSeats = [],
   currentUser,
-  timeSlot,
   onToggleDrawer,
   drawerOpen = false,
   isWeekend = false,
@@ -203,7 +200,7 @@ export default function SeatingLayout({
                     onClick={() => handleZoneFocus("fullmap", zoomToElement)}
                   />
                 </Box>
-                
+
                 {/* My Booked List Button - Hidden when drawer is open */}
                 {!drawerOpen && (
                   <Button
@@ -400,14 +397,24 @@ export default function SeatingLayout({
                           height={200}
                           bookedSeats={bookedSeats}
                           currentUser={currentUser}
-                          timeSlot={timeSlot}
                           isWeekend={isWeekend}
                         />
                       ))}
                     </Box>
                   </Box>
-                  <Box id="seating-meeting" sx={{ width: 200, flexShrink: 0, border: '6px solid black', borderTop: 'none', borderBottom: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#333', fontSize: '2rem', textAlign: 'center' }}>Meeting Rooms</Typography>
+                  <Box id="seating-meeting" sx={{ width: 200, flexShrink: 0, display: 'flex', alignItems: 'flex-start' }}>
+                    <Image
+                      src="/meeting-room.png"
+                      alt="Meeting Rooms"
+                      width={200}
+                      height={200}
+                      style={{
+                        height: "auto",
+                        maxWidth: "100%",
+                        maxHeight: "100%",
+                        borderBottom: '12px solid black',
+                      }}
+                    />
                   </Box>
                   {/* Zone 2 */}
                   <Box
@@ -454,7 +461,6 @@ export default function SeatingLayout({
                           height={200}
                           bookedSeats={bookedSeats}
                           currentUser={currentUser}
-                          timeSlot={timeSlot}
                           rotated={true}
                           isWeekend={isWeekend}
                         />

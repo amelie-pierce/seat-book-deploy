@@ -57,13 +57,6 @@ export default function Home() {
   };
 
   // Check if a given date string is in the past
-  const isDateInPast = (dateStr: string): boolean => {
-    const date = new Date(dateStr + 'T00:00:00');
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Reset time to compare only dates
-    return date < today;
-  };
-
   // Generate 10 working days with Friday 3 PM deadline logic
   const dateChips = useMemo(() => {
     const now = new Date();
@@ -83,7 +76,7 @@ export default function Home() {
 
       // Add 10 working days (2 weeks of Mon-Fri)
       let addedDays = 0;
-      let currentDate = new Date(nextMonday);
+      const currentDate = new Date(nextMonday);
       while (addedDays < 10) {
         const dayOfWeek = currentDate.getDay();
         // Only add weekdays (Monday = 1 to Friday = 5)
@@ -101,7 +94,7 @@ export default function Home() {
 
       // Add 10 working days (2 weeks of Mon-Fri)
       let addedDays = 0;
-      let currentDate = new Date(monday);
+      const currentDate = new Date(monday);
       while (addedDays < 10) {
         const dayOfWeek = currentDate.getDay();
         // Only add weekdays (Monday = 1 to Friday = 5)
@@ -188,9 +181,6 @@ export default function Home() {
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [userBookings, setUserBookings] = useState<BookingRecord[]>([]);
   const [userEmail, setUserEmail] = useState<string>("");
-  const [bookingsMap, setBookingsMap] = useState<{
-    [date: string]: { seatId: string; timeSlot: "AM" | "PM" | "FULL_DAY" };
-  }>({});
   const [isLoadingBookings, setIsLoadingBookings] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string | null>(
     getFirstAvailableDate()
@@ -202,7 +192,6 @@ export default function Home() {
     Array<{
       seatId: string;
       userId: string;
-      timeSlot: "AM" | "PM" | "FULL_DAY";
     }>
   >([]);
 
@@ -240,14 +229,15 @@ export default function Home() {
     [seatId: string]: string[];
   }>({});
 
-  // Memoize filtered userBookings to prevent infinite loops in ReservationForm
-  const activeUserBookings = useMemo(() => {
+  // Prepare all bookings data for the seat modal
+  const allBookingsForModal = useMemo(() => {
     return userBookings
       .filter((b) => b.status === "ACTIVE")
       .map((b) => ({
-        date: b.date,
         seatId: b.seatId,
+        userId: b.userId,
         timeSlot: b.timeSlot,
+        date: b.date,
       }));
   }, [userBookings]);
 
@@ -295,7 +285,6 @@ export default function Home() {
         const bookedSeatsData = allBookings.map((booking) => ({
           seatId: booking.seatId,
           userId: booking.userId,
-          timeSlot: booking.timeSlot,
         }));
         setAllBookingsForDate(bookedSeatsData);
       } catch (error) {
@@ -346,16 +335,6 @@ export default function Home() {
 
           const userData = await bookingService.loadUserData(currentUser);
           setUserBookings(userData.userBookings);
-
-          // Create a map of bookings by date
-          const bookings = userData.userBookings.reduce((acc, booking) => {
-            acc[booking.date] = {
-              seatId: booking.seatId,
-              timeSlot: booking.timeSlot,
-            };
-            return acc;
-          }, {} as { [key: string]: { seatId: string; timeSlot: "AM" | "PM" | "FULL_DAY" } });
-          setBookingsMap(bookings);
 
           // Note: Date-specific data loading is handled by handleDateClick and other date change events
           // We don't need to load it here during user login to avoid redundant API calls
@@ -512,7 +491,7 @@ export default function Home() {
   }, [showAddSeatDropdown, currentUser, dateChips.dates]);
 
   const handleSeatClick = (seatId: string, event?: React.MouseEvent<HTMLButtonElement>) => {
-    // Check seat availability using the new logic
+    // Check seat availability - simplified for FULL_DAY bookings only
     const isSeatClickable = () => {
       // Find all bookings for this seat on the selected date
       const seatBookings = allBookingsForDate.filter(
@@ -534,32 +513,8 @@ export default function Home() {
         return true;
       }
 
-      // Check for FULL_DAY bookings by other users
-      const hasFullDayBooking = seatBookings.some(
-        (booking) => booking.timeSlot === "FULL_DAY" && booking.userId !== currentUser
-      );
-      if (hasFullDayBooking) {
-        return false;
-      }
-
-      // Check if both AM and PM are booked by different users (not current user)
-      const amBooking = seatBookings.find(
-        (booking) => booking.timeSlot === "AM"
-      );
-      const pmBooking = seatBookings.find(
-        (booking) => booking.timeSlot === "PM"
-      );
-
-      if (amBooking && pmBooking &&
-        amBooking.userId !== currentUser &&
-        pmBooking.userId !== currentUser &&
-        amBooking.userId !== pmBooking.userId) {
-        // Both AM and PM booked by different users (not current user) - not available
-        return false;
-      }
-
-      // If only AM or only PM is booked, or both are booked by same user, seat is still available
-      return true;
+      // If someone else has booked it, it's not available
+      return false;
     };
 
     if (isSeatClickable()) {
@@ -624,86 +579,12 @@ export default function Home() {
     setMobileSeatModalDate("");
   };
 
-  const handleMobileSeatModalSubmit = async (
-    seatId: string,
-    timeSlot: "AM" | "PM" | "FULL_DAY"
-  ) => {
-    if (!mobileSeatModalDate || !currentUser) return;
-
-    try {
-      // Check if user already has a booking on this date
-      const existingBookingOnDate = userBookings.find(
-        (booking) =>
-          booking.date === mobileSeatModalDate &&
-          booking.status === "ACTIVE"
-      );
-
-      // If there's an existing booking on a different seat, remove it first
-      if (existingBookingOnDate && existingBookingOnDate.seatId !== seatId) {
-        console.log(`Moving booking from ${existingBookingOnDate.seatId} to ${seatId}`);
-        await bookingService.cancelBooking(existingBookingOnDate.id, currentUser);
-      }
-
-      // Create the new booking
-      const bookings = [
-        {
-          date: mobileSeatModalDate,
-          seatId,
-          timeSlot,
-        },
-      ];
-
-      await handleReservation(bookings);
-      handleMobileSeatModalClose();
-    } catch (error) {
-      console.error("Failed to create mobile reservation:", error);
-    }
-  };
-
-  const handleMobileSeatModalRemove = async (
-    seatId: string,
-    timeSlot: "AM" | "PM" | "FULL_DAY"
-  ) => {
-    if (!mobileSeatModalDate || !currentUser) return;
-
-    try {
-      // Find the booking to remove
-      const bookingToRemove = userBookings.find(
-        (booking) =>
-          booking.seatId === seatId &&
-          booking.date === mobileSeatModalDate &&
-          booking.timeSlot === timeSlot &&
-          booking.status === "ACTIVE"
-      );
-
-      if (bookingToRemove) {
-        // Use the booking service to cancel the booking
-        await bookingService.cancelBooking(bookingToRemove.id, currentUser);
-
-        // Refresh user bookings
-        const userData = await bookingService.loadUserData(currentUser);
-        setUserBookings(userData.userBookings);
-
-        // Refresh the current date view
-        if (selectedDate) {
-          await handleDateClick(selectedDate);
-        }
-      }
-
-      handleMobileSeatModalClose();
-    } catch (error) {
-      console.error("Failed to remove reservation:", error);
-      setBookingError("Failed to remove reservation. Please try again.");
-    }
-  };
-
   const handleLogout = async () => {
     // Clear all state before logout
     setSelectedSeat(null);
     setSelectedSeatsFromClick({});
     setSelectedSeatsFromDropdown({});
     setUserBookings([]);
-    setBookingsMap({});
 
     clearUserSession();
 
@@ -721,78 +602,6 @@ export default function Home() {
 
   const handleDrawerToggle = () => {
     setDrawerOpen(!drawerOpen);
-  };
-
-  const handleReservation = async (
-    bookings: Array<{
-      date: string;
-      seatId: string;
-      timeSlot: "AM" | "PM" | "FULL_DAY";
-    }>
-  ) => {
-    if (bookings.length > 0) {
-      try {
-        setBookingError(null);
-
-        const result = await bookingService.createMultipleBookings(
-          currentUser!,
-          bookings
-        );
-
-        if (result.success) {
-          console.log(
-            `✅ ${result.bookings?.length || 0} bookings created successfully`
-          );
-
-          if (result.failedBookings && result.failedBookings.length > 0) {
-            // Check if any failures were due to conflicts
-            const hasConflicts = result.failedBookings.some((msg) =>
-              msg.includes("Already booked")
-            );
-            const errorMessage = hasConflicts
-              ? `⚠️ Some seats were taken by other users: ${result.error}`
-              : `Some bookings failed: ${result.error}`;
-            setBookingError(errorMessage);
-          }
-
-          // Reload user bookings FIRST
-          const userData = await bookingService.loadUserData(currentUser!);
-          setUserBookings(userData.userBookings);
-
-          // Refresh the current date view to update allBookingsForDate
-          if (selectedDate) {
-            await handleDateClick(selectedDate);
-          }
-
-          // Clear selections - the ReservationForm should now have updated userBookings
-          setSelectedSeat(null);
-          setSelectedSeatsFromClick({});
-          setSelectedSeatsFromDropdown({});
-
-          console.log("✅ Bookings created and state refreshed");
-        } else {
-          // Check if error indicates conflicts and refresh data
-          const isConflictError =
-            result.error?.includes("already taken") ||
-            result.error?.includes("Already booked");
-          if (isConflictError) {
-            // Force refresh to show updated seat availability
-            await bookingService.refreshAfterConflict();
-            if (selectedDate) {
-              await handleDateClick(selectedDate);
-            }
-            setBookingError(
-              `${result.error} Data refreshed - please try again with available seats.`
-            );
-          } else {
-            setBookingError(result.error || "Failed to create bookings");
-          }
-        }
-      } catch (error) {
-        console.error("❌ Error creating bookings:", error);
-        setBookingError("Failed to create bookings. Please try again.");
-      }
-    }
   };
 
   const handleDropdownSelectionChange = (selections: {
@@ -842,17 +651,6 @@ export default function Home() {
     }
   };
 
-  const handleClearBooking = () => {
-    setSelectedSeat(null);
-    // Also clear the per-date click selection for current date
-    if (selectedDate) {
-      setSelectedSeatsFromClick((prev) => ({
-        ...prev,
-        [selectedDate]: "",
-      }));
-    }
-  };
-
   // Handle deleting all bookings for a specific seat
   const handleDeleteSeatBookings = async (seatId: string) => {
     if (!currentUser) return;
@@ -881,7 +679,6 @@ export default function Home() {
         const bookedSeatsData = dateBookings.map((booking) => ({
           seatId: booking.seatId,
           userId: booking.userId,
-          timeSlot: booking.timeSlot,
         }));
         setAllBookingsForDate(bookedSeatsData);
 
@@ -1058,7 +855,6 @@ export default function Home() {
         const bookedSeatsData = dateBookings.map((booking) => ({
           seatId: booking.seatId,
           userId: booking.userId,
-          timeSlot: booking.timeSlot,
         }));
         setAllBookingsForDate(bookedSeatsData);
 
@@ -1103,7 +899,6 @@ export default function Home() {
         const bookedSeatsData = allBookings.map((booking) => ({
           seatId: booking.seatId,
           userId: booking.userId,
-          timeSlot: booking.timeSlot,
         }));
         setAllBookingsForDate(bookedSeatsData);
       } catch (err) {
@@ -1369,7 +1164,6 @@ export default function Home() {
             selectedDate={selectedDate || undefined}
             bookedSeats={allBookingsForDate}
             currentUser={currentUser || undefined}
-            timeSlot={bookingsMap[selectedDate || ""]?.timeSlot}
             onToggleDrawer={handleDrawerToggle}
             drawerOpen={drawerOpen}
             isWeekend={selectedDate ? isDateWeekend(selectedDate) : false}
@@ -1679,11 +1473,11 @@ export default function Home() {
         onClose={handleMobileSeatModalClose}
         seatId={mobileSeatModalSeatId}
         selectedDate={mobileSeatModalDate}
-        onSubmit={handleMobileSeatModalSubmit}
-        onRemove={handleMobileSeatModalRemove}
         currentUser={currentUser || undefined}
         allBookingsForDate={allBookingsForDate}
         anchorPosition={modalAnchorPosition}
+        allDates={dateChips.dates}
+        allBookings={allBookingsForModal}
       />
 
       {/* Booking Error Snackbar */}

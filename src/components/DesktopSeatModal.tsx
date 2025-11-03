@@ -4,46 +4,30 @@ import {
   Button,
   Typography,
   Box,
-  Alert,
   Chip,
-  Avatar,
   Paper,
 } from "@mui/material";
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
-import DeleteIcon from '@mui/icons-material/Delete';
-import { format } from 'date-fns';
 import { SEATING_CONFIG } from '../config/seatingConfig';
-
-const userAvatar = {
-  1234: 'https://i.pravatar.cc/150?img=1',
-  "U001": 'https://i.pravatar.cc/150?img=2',
-  "U002": 'https://i.pravatar.cc/150?img=3',
-  "U003": 'https://i.pravatar.cc/150?img=4',
-  "U004": 'https://i.pravatar.cc/150?img=5',
-} as { [key: string]: string };
-
-type TimeSlotType = 'AM' | 'PM' | 'FULL_DAY';
+import { bookingService } from '../services/bookingService';
+import { BookingRecord } from '../utils/bookingStorage';
 
 interface DesktopSeatModalProps {
   open: boolean;
   onClose: () => void;
   seatId: string;
   selectedDate: string;
-  onSubmit: (seatId: string, timeSlot: TimeSlotType) => void;
-  onRemove?: (seatId: string, timeSlot: TimeSlotType) => void;
   currentUser?: string;
-  currentUserBooking?: {
-    seatId: string;
-    userId: string;
-    timeSlot: 'AM' | 'PM' | 'FULL_DAY';
-  } | undefined;
-  availableTimeSlots: TimeSlotType[];
   anchorPosition?: { top: number; left: number } | null;
   seatBookings: Array<{
     seatId: string;
     userId: string;
-    timeSlot: 'AM' | 'PM' | 'FULL_DAY';
   }>;
+  allDates?: Date[]; // All available dates to display
+  allBookings?: Array<{
+    seatId: string;
+    userId: string;
+    date: string;
+  }>; // All bookings across all dates
 }
 
 export default function DesktopSeatModal({
@@ -51,74 +35,114 @@ export default function DesktopSeatModal({
   onClose,
   seatId,
   selectedDate,
-  onSubmit,
-  onRemove,
   currentUser,
-  currentUserBooking,
-  availableTimeSlots,
   anchorPosition,
   seatBookings,
+  allDates = [],
+  allBookings = [],
 }: DesktopSeatModalProps) {
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<TimeSlotType | ''>('');
+  const [internalSelectedDate, setInternalSelectedDate] = useState<string>(selectedDate);
+  const [modifiedDates, setModifiedDates] = useState<{ [dateStr: string]: boolean }>({});
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  const isCurrentUserBooked = !!currentUserBooking;
-
-  // Auto-select time slot when modal opens
-  useEffect(() => {
-    if (open) {
-      // Only auto-select if there's exactly one available slot
-      if (availableTimeSlots.length === 1) {
-        setSelectedTimeSlot(availableTimeSlots[0]);
-      } else {
-        // For multiple options, let user choose manually
-        setSelectedTimeSlot('');
-      }
-    } else {
-      // Reset when modal closes
-      setSelectedTimeSlot('');
-    }
-  }, [open, availableTimeSlots]);
-
-  const handleSubmit = () => {
-    if (selectedTimeSlot) {
-      onSubmit(seatId, selectedTimeSlot);
-      onClose();
-      setSelectedTimeSlot('');
-    }
+  // Helper function to format date
+  const formatLocalDate = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
-  const handleRemove = () => {
-    if (currentUserBooking && onRemove) {
-      onRemove(seatId, currentUserBooking.timeSlot);
+  // Get month and year from the dates
+  const getMonthYear = () => {
+    if (allDates.length > 0) {
+      const firstDate = allDates[0];
+      const monthName = firstDate.toLocaleDateString('en-US', { month: 'long' });
+      const year = firstDate.getFullYear();
+      return `${monthName}, ${year}`;
+    }
+    return '';
+  };
+
+  // Get user's bookings for this seat across all dates
+  const getUserBookingsForSeat = () => {
+    if (!currentUser || !allBookings) return [];
+    return allBookings.filter(
+      booking => booking.seatId === seatId && booking.userId === currentUser
+    ).map(booking => booking.date);
+  };
+
+  // Get dates booked by other users for this seat
+  const getDisabledDates = () => {
+    if (!allBookings) return [];
+    return allBookings
+      .filter(booking => booking.seatId === seatId && booking.userId !== currentUser)
+      .map(booking => booking.date);
+  };
+
+  const userBookedDates = getUserBookingsForSeat();
+  const disabledDates = getDisabledDates();
+
+  // Update internal selected date when prop changes
+  useEffect(() => {
+    if (open) {
+      setInternalSelectedDate(selectedDate);
+      setModifiedDates({});
+    }
+  }, [open, selectedDate]);
+
+  const handleDateToggle = (dateStr: string, isCurrentlyBooked: boolean) => {
+    setInternalSelectedDate(dateStr);
+    setModifiedDates(prev => ({
+      ...prev,
+      [dateStr]: !isCurrentlyBooked,
+    }));
+  };
+
+  const handleUpdate = async () => {
+    if (!currentUser) return;
+
+    try {
+      setIsUpdating(true);
+
+      // Process all modifications for this seat
+      for (const [dateStr, shouldBook] of Object.entries(modifiedDates)) {
+        if (shouldBook) {
+          // Add new booking
+          await bookingService.createBooking(
+            currentUser,
+            seatId,
+            "FULL_DAY",
+            dateStr
+          );
+        } else {
+          // Remove booking - find the booking ID first
+          const userData = await bookingService.loadUserData(currentUser);
+          const bookingToRemove = userData.userBookings.find(
+            (b: BookingRecord) => b.seatId === seatId && b.date === dateStr
+          );
+          
+          if (bookingToRemove) {
+            await bookingService.cancelBooking(bookingToRemove.id, currentUser);
+          }
+        }
+      }
+
+      // Clear modifications
+      setModifiedDates({});
+      setIsUpdating(false);
+      
+      // Close modal
       onClose();
-      setSelectedTimeSlot('');
+    } catch (error) {
+      console.error("Error updating bookings:", error);
+      setIsUpdating(false);
     }
   };
 
   const handleClose = () => {
     onClose();
-    setSelectedTimeSlot('');
-  };
-
-  const formatDate = (dateStr: string) => {
-    if(!dateStr) return '';
-    // Parse the date string as local date to avoid timezone offset issues
-    const [year, month, day] = dateStr.split('-').map(Number);
-    const localDate = new Date(year, month - 1, day);
-    return format(localDate, 'EEEE, MMMM d, yyyy');
-  };
-
-  const getTimeSlotLabel = (timeSlot: TimeSlotType) => {
-    switch (timeSlot) {
-      case 'AM':
-        return 'AM';
-      case 'PM':
-        return 'PM';
-      case 'FULL_DAY':
-        return 'Full Day';
-      default:
-        return timeSlot;
-    }
+    setModifiedDates({});
   };
 
   const getSeatDisplayName = (seatId: string) => {
@@ -176,12 +200,6 @@ export default function DesktopSeatModal({
                 color="success"
                 sx={{ borderRadius: 2 }}
               />
-            ) : availableTimeSlots.length > 0 ? (
-              <Chip
-                label="Partially Booked"
-                color="warning"
-                sx={{ borderRadius: 2 }}
-              />
             ) : (
               <Chip
                 label="Booked"
@@ -192,177 +210,113 @@ export default function DesktopSeatModal({
           </Box>
         </Box>
 
-        {/* Content */}
-        <Box>
-        {seatBookings.length > 0 ? (
-          // Show all bookings for this seat
-          <>
-            <Box sx={{ borderTop: 1, borderColor: 'grey.300', pt: 2, mb: 3 }}>
-              <Typography variant="body2" sx={{ mb: 2, fontWeight: 600 }}>
-                Current Bookings:
-              </Typography>
-              
-              {seatBookings.map((booking, index) => (
-                <Box 
-                  key={index}
-                  sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: 2, 
-                    mb: 2,
-                    p: 1.5,
-                    backgroundColor: booking.userId === currentUser ? 'primary.50' : 'grey.50',
-                    borderRadius: 2,
-                    border: booking.userId === currentUser ? '2px solid' : '1px solid',
-                    borderColor: booking.userId === currentUser ? 'primary.main' : 'grey.200',
-                  }}
-                >
-                  <Avatar
-                    src={userAvatar[booking.userId]}
-                    sx={{
-                      width: 40,
-                      height: 40,
-                    }}
-                  >
-                    {booking.userId.charAt(0)}
-                  </Avatar>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2" fontWeight="bold">
-                      {booking.userId}
-                      {booking.userId === currentUser && (
-                        <Chip 
-                          label="You" 
-                          size="small" 
-                          color="primary"
-                          sx={{ ml: 1, height: 20, fontSize: '0.7rem' }}
-                        />
-                      )}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {getTimeSlotLabel(booking.timeSlot)}
-                    </Typography>
-                  </Box>
-                </Box>
-              ))}
-            </Box>
+        {/* Date Selection Section - Show if allDates provided */}
+        {allDates.length > 0 && (
+          <Box sx={{ mb: 3, borderBottom: 1, borderColor: 'grey.300', pb: 2 }}>
+            <Typography
+              sx={{
+                fontSize: '0.875rem',
+                color: '#1F2937',
+                mb: 1,
+              }}
+            >
+              Select date <span style={{ fontWeight: 600 }}>({getMonthYear()}):</span>
+            </Typography>
 
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, pt: 2, borderTop: 1, borderColor: 'grey.300' }}>
-              <CalendarTodayIcon fontSize="small" />
-              <Typography variant="body2" color="text.secondary">
-                {formatDate(selectedDate)}
-              </Typography>
-            </Box>
-          </>
-        ) : (
-          // Show booking interface when seat is free
-          <>
-            {/* Seat and Date Info */}
-            <Box sx={{ borderTop: 1, borderColor: 'grey.300', pt: 2, mb: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                <CalendarTodayIcon fontSize="small" />
-                <span>Available</span>
-              </Box>
-              <Typography variant="body1" color="grey.500">
-                {formatDate(selectedDate)}
-              </Typography>
-            </Box>
+            {/* Date Chips Grid */}
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(5, 1fr)',
+                gap: 1,
+              }}
+            >
+              {allDates
+                .filter((date) => {
+                  const dayOfWeek = date.getDay();
+                  // Only show weekdays (Monday = 1 to Friday = 5)
+                  return dayOfWeek >= 1 && dayOfWeek <= 5;
+                })
+                .map((date) => {
+                  const dateStr = formatLocalDate(date);
+                  const isOriginallyBooked = userBookedDates.includes(dateStr);
+                  const isModified = modifiedDates[dateStr] !== undefined;
+                  
+                  // Check if date is in the past
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  const isPastDate = date < today;
+                  
+                  // Disable if booked by others OR if date is in the past
+                  const isDisabled = disabledDates.includes(dateStr) || isPastDate;
+                  
+                  // Calculate effective state after modifications
+                  let isBooked = isOriginallyBooked;
+                  if (isModified) {
+                    isBooked = modifiedDates[dateStr]; // true = will be booked, false = will be unbooked
+                  }
+                  
+                  const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+                  const dayNumber = String(date.getDate()).padStart(2, '0');
+                  const isSelected = dateStr === internalSelectedDate;
 
-            {/* Time Slot Selection */}
-            {availableTimeSlots.length > 0 ? (
-              <Box sx={{ mb: 3, borderTop: 1, borderColor: 'grey.300', pt: 2 }}>
-                <Typography variant="body2" sx={{ mb: 2 }}>
-                  Select a time slot:
-                </Typography>
-                <Box sx={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: 1.5,
-                }}>
-                  {availableTimeSlots.map(timeSlot => (
+                  return (
                     <Chip
-                      key={timeSlot}
-                      label={getTimeSlotLabel(timeSlot)}
-                      onClick={() => setSelectedTimeSlot(timeSlot)}
-                      clickable
+                      key={dateStr}
+                      label={`${dayName}, ${dayNumber}`}
+                      onClick={isDisabled ? undefined : () => handleDateToggle(dateStr, isOriginallyBooked)}
+                      disabled={isDisabled}
                       sx={{
-                        px: 0.5,
-                        py: 0.25,
-                        fontSize: '0.875rem',
-                        fontWeight: 600,
-                        backgroundColor: selectedTimeSlot === timeSlot ? "grey.600" : "grey.200",
-                        color: selectedTimeSlot === timeSlot ? "white" : "grey.800",
-                        minWidth: 100,
-                        height: 40,
-                        borderRadius: 2,
-                        transition: 'all 0.2s ease-in-out',
+                        borderRadius: '6px',
+                        backgroundColor: isDisabled ? '#F3F4F6' : (isBooked ? '#FFE8DF' : '#E5E7EB'),
+                        color: isDisabled ? '#9CA3AF' : (isBooked ? '#FF6B35' : '#6B7280'),
+                        border: isSelected ? '2px solid #FF6B35' : (isModified && !isDisabled ? '2px solid #FF6B35' : 'none'),
+                        fontWeight: isSelected ? 600 : 500,
+                        fontSize: '0.75rem',
+                        height: '32px',
+                        cursor: isDisabled ? 'not-allowed' : 'pointer',
+                        opacity: isDisabled ? 0.6 : 1,
+                        '& .MuiChip-label': {
+                          px: 1,
+                          py: 0,
+                        },
                         '&:hover': {
-                          transform: 'scale(1.05)',
-                          backgroundColor: "grey.600",
+                          backgroundColor: isDisabled 
+                            ? '#F3F4F6' 
+                            : (isBooked ? '#FFD4C4' : '#D1D5DB'),
                         },
                       }}
                     />
-                  ))}
-                </Box>
-              </Box>
-            ) : (
-              <Alert severity="warning" sx={{ mb: 3, borderRadius: 2 }}>
-                This seat is not available for the selected date. All time slots are already booked.
-              </Alert>
-            )}
-          </>
+                  );
+                })}
+            </Box>
+          </Box>
         )}
-        </Box>
 
         {/* Actions */}
         <Box sx={{ mt: 3, display: 'flex', gap: 2, flexDirection: 'column' }}>
-          {/* Show remove button if current user has booked */}
-          {isCurrentUserBooked && (
-            <Button
-              onClick={handleRemove}
-              variant="outlined"
-              fullWidth
-              size="large"
-              startIcon={<DeleteIcon />}
-              sx={{
-                fontSize: '1rem',
-                fontWeight: 600,
-                color: 'error.main',
-                borderColor: 'error.main',
-                '&:hover': {
-                  backgroundColor: 'error.main',
-                  color: 'white',
-                  borderColor: 'error.main',
-                }
-              }}
-            >
-              Remove My Booking
-            </Button>
-          )}
-          
-          {/* Show book button if there are available slots */}
-          {availableTimeSlots.length > 0 && (
-            <Button
-              onClick={handleSubmit}
-              variant="contained"
-              disabled={!selectedTimeSlot}
-              fullWidth
-              size="large"
-              sx={{
-                py: 1.5,
-                fontSize: '1rem',
-                fontWeight: 600
-              }}
-            >
-              Book Desk
-            </Button>
-          )}
-
-          {/* Show message if fully booked and user hasn't booked */}
-          {availableTimeSlots.length === 0 && !isCurrentUserBooked && (
-            <Alert severity="info" sx={{ borderRadius: 2 }}>
-              This seat is fully booked for the selected date.
-            </Alert>
-          )}
+          {/* Update button - always visible, disabled if no modifications */}
+          <Button
+            onClick={handleUpdate}
+            variant="contained"
+            fullWidth
+            size="large"
+            disabled={Object.keys(modifiedDates).length === 0 || isUpdating}
+            sx={{
+              fontSize: '1rem',
+              fontWeight: 600,
+              backgroundColor: '#FF6B35',
+              '&:hover': {
+                backgroundColor: '#E55A2B',
+              },
+              '&:disabled': {
+                backgroundColor: '#D1D5DB',
+                color: '#9CA3AF',
+              },
+            }}
+          >
+            {isUpdating ? 'Updating...' : 'Update'}
+          </Button>
         </Box>
       </Paper>
     </Popover>

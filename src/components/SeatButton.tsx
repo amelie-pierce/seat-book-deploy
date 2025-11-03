@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Box, IconButton, Typography, Avatar } from "@mui/material";
+import { IconButton, Typography, Avatar } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 
 const userAvatar = {
@@ -19,18 +19,7 @@ interface SeatButtonProps {
   seatId?: string;
   selected?: boolean;
   bookedByUser?: string; // User ID who booked the seat
-  bookedByUsers?: {
-    am?: string; // User ID who booked AM slot
-    pm?: string; // User ID who booked PM slot
-  };
-  timeSlots?: {
-    am: boolean;
-    pm: boolean;
-    isCurrentUser: boolean;
-    amIsCurrentUser?: boolean;
-    pmIsCurrentUser?: boolean;
-    timeSlot?: "AM" | "PM" | "FULL_DAY";
-  };
+  currentUser?: string; // Current logged-in user ID
   isWeekend?: boolean; // Flag to disable seat on weekends
 }
 
@@ -43,30 +32,19 @@ function SeatButton({
   seatId,
   selected = false, // eslint-disable-line @typescript-eslint/no-unused-vars
   bookedByUser,
-  bookedByUsers,
-  timeSlots = {
-    am: false,
-    pm: false,
-    isCurrentUser: false,
-    amIsCurrentUser: false,
-    pmIsCurrentUser: false,
-  },
+  currentUser,
   isWeekend = false,
 }: SeatButtonProps) {
   const [isHovered, setIsHovered] = useState(false);
   
-  // Check if the seat is booked (either AM, PM, or FULL_DAY)
-  const isBooked = timeSlots.am || timeSlots.pm;
+  // Check if the seat is booked (full day only)
+  const isBooked = !!bookedByUser;
   
+  // Check if booked by current user
+  const isBookedByCurrentUser = bookedByUser === currentUser;
+
   // Disable seat if it's weekend
   const isDisabled = isWeekend;
-  
-  // Check if seat is booked by two different users (one for AM, one for PM)
-  const hasTwoUsers = bookedByUsers && bookedByUsers.am && bookedByUsers.pm && bookedByUsers.am !== bookedByUsers.pm;
-
-  // Check if it's a half-day booking (only AM or only PM, not both)
-  const isAMOnly = timeSlots.am && !timeSlots.pm;
-  const isPMOnly = !timeSlots.am && timeSlots.pm;
 
   return (
     <IconButton
@@ -105,7 +83,7 @@ function SeatButton({
         padding: 0,
         overflow: "hidden",
         // border: `2px solid #CDCFD0`,
-        backgroundColor: isDisabled ? '#D1D5DB' : (isBooked ? 'primary.main' : '#61BF76'),
+        backgroundColor: isDisabled ? '#D1D5DB' : (isBooked ? (isBookedByCurrentUser ? '#F5A623' : '#CDCFD0') : '#61BF76'),
         opacity: isDisabled ? 0.5 : 1,
         cursor: isDisabled ? 'not-allowed' : 'pointer',
         "&:hover": {
@@ -118,156 +96,8 @@ function SeatButton({
       }}
         // disabled={!isAvailable && !timeSlots.isCurrentUser}
     >
-      {hasTwoUsers ? (
-        // Show both avatars side by side when seat is booked by two different users
-        <Box
-          sx={{
-            display: "flex",
-            width: "100%",
-            height: "100%",
-            position: "relative",
-            zIndex: 1,
-          }}
-        >
-          {/* Left half - AM user (show left half of avatar) */}
-          <Box
-            sx={{
-              width: "50%",
-              height: "100%",
-              position: "relative",
-              overflow: "hidden",
-            }}
-          >
-            <Avatar
-              src={userAvatar[bookedByUsers!.am!]}
-              sx={{
-                width: 41,
-                height: 41,
-                fontSize: '0.75rem',
-                position: "absolute",
-                left: 4,
-                top: "50%",
-                transform: "translateY(-50%)",
-              }}
-            >
-              {bookedByUsers!.am!.charAt(0)}
-            </Avatar>
-          </Box>
-          {/* Right half - PM user (show right half of avatar) */}
-          <Box
-            sx={{
-              width: "50%",
-              height: "100%",
-              position: "relative",
-              overflow: "hidden",
-            }}
-          >
-            <Avatar
-              src={userAvatar[bookedByUsers!.pm!]}
-              sx={{
-                width: 41,
-                height: 41,
-                fontSize: '0.75rem',
-                position: "absolute",
-                right: 4,
-                top: "50%",
-                transform: "translateY(-50%)",
-              }}
-            >
-              {bookedByUsers!.pm!.charAt(0)}
-            </Avatar>
-          </Box>
-        </Box>
-      ) : isBooked && bookedByUser && isAMOnly ? (
-        // Show left half of avatar for AM-only booking
-        <Box
-          sx={{
-            display: "flex",
-            width: "100%",
-            height: "100%",
-            position: "relative",
-            zIndex: 1,
-          }}
-        >
-          {/* Left half - AM user */}
-          <Box
-            sx={{
-              width: "50%",
-              height: "100%",
-              position: "relative",
-              overflow: "hidden",
-            }}
-          >
-            <Avatar
-              src={userAvatar[bookedByUser]}
-              sx={{
-                width: 41,
-                height: 41,
-                fontSize: '0.75rem',
-                position: "absolute",
-                left: 4,
-                top: "50%",
-                transform: "translateY(-50%)",
-              }}
-            >
-              {bookedByUser.charAt(0)}
-            </Avatar>
-          </Box>
-          {/* Right half - empty/gray */}
-          <Box
-            sx={{
-              width: "50%",
-              height: "100%",
-              backgroundColor: "rgba(255, 255, 255, 0.3)",
-            }}
-          />
-        </Box>
-      ) : isBooked && bookedByUser && isPMOnly ? (
-        // Show right half of avatar for PM-only booking
-        <Box
-          sx={{
-            display: "flex",
-            width: "100%",
-            height: "100%",
-            position: "relative",
-            zIndex: 1,
-          }}
-        >
-          {/* Left half - empty/gray */}
-          <Box
-            sx={{
-              width: "50%",
-              height: "100%",
-              backgroundColor: "rgba(255, 255, 255, 0.3)",
-            }}
-          />
-          {/* Right half - PM user */}
-          <Box
-            sx={{
-              width: "50%",
-              height: "100%",
-              position: "relative",
-              overflow: "hidden",
-            }}
-          >
-            <Avatar
-              src={userAvatar[bookedByUser]}
-              sx={{
-                width: 41,
-                height: 41,
-                fontSize: '0.75rem',
-                position: "absolute",
-                right: 4,
-                top: "50%",
-                transform: "translateY(-50%)",
-              }}
-            >
-              {bookedByUser.charAt(0)}
-            </Avatar>
-          </Box>
-        </Box>
-      ) : isBooked && bookedByUser ? (
-        // Show full avatar for FULL_DAY booking (both AM and PM by same user)
+      {isBooked && bookedByUser ? (
+        // Show full avatar for full-day booking
         <Avatar
           src={userAvatar[bookedByUser]}
           sx={{
