@@ -101,7 +101,7 @@ export default function AuthPage() {
           }}
         >
           <Image
-            src="/lovechair.png"
+            src="/logo.png"
             alt="Flexi Seat Logo"
             width={32}
             height={32}

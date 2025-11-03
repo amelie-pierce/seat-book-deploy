@@ -19,6 +19,7 @@ interface SeatModalProps {
     userId: string;
     date: string;
   }>; // All bookings across all dates
+  disabledDates?: string[]; // Dates booked by other users
   onSuccess?: () => void; // Callback after successful booking update
 }
 
@@ -32,6 +33,7 @@ export default function SeatModal({
   anchorPosition,
   allDates = [],
   allBookings = [],
+  disabledDates = [],
   onSuccess,
 }: SeatModalProps) {
   const theme = useTheme();
@@ -58,6 +60,7 @@ export default function SeatModal({
     seatBookings, // Pass all bookings for this seat
     allDates, // Pass all available dates
     allBookings, // Pass all bookings across dates
+    disabledDates, // Pass dates booked by other users
     onSuccess,
   };
 
@@ -71,6 +74,7 @@ export default function SeatModal({
     seatBookings,
     allDates,
     allBookings,
+    disabledDates,
     anchorPosition,
     onSuccess,
   };

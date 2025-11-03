@@ -27,6 +27,7 @@ interface DesktopSeatModalProps {
     userId: string;
     date: string;
   }>; // All bookings across all dates
+  disabledDates?: string[]; // Dates booked by other users
   onSuccess?: () => void; // Callback after successful booking update
 }
 
@@ -37,9 +38,9 @@ export default function DesktopSeatModal({
   selectedDate,
   currentUser,
   anchorPosition,
-  seatBookings,
   allDates = [],
   allBookings = [],
+  disabledDates = [],
   onSuccess,
 }: DesktopSeatModalProps) {
   const [internalSelectedDate, setInternalSelectedDate] = useState<string>(selectedDate);
@@ -73,16 +74,7 @@ export default function DesktopSeatModal({
     ).map(booking => booking.date);
   };
 
-  // Get dates booked by other users for this seat
-  const getDisabledDates = () => {
-    if (!allBookings) return [];
-    return allBookings
-      .filter(booking => booking.seatId === seatId && booking.userId !== currentUser)
-      .map(booking => booking.date);
-  };
-
   const userBookedDates = getUserBookingsForSeat();
-  const disabledDates = getDisabledDates();
 
   // Update internal selected date when prop changes
   useEffect(() => {
@@ -94,10 +86,21 @@ export default function DesktopSeatModal({
 
   const handleDateToggle = (dateStr: string, isCurrentlyBooked: boolean) => {
     setInternalSelectedDate(dateStr);
-    setModifiedDates(prev => ({
-      ...prev,
-      [dateStr]: !isCurrentlyBooked,
-    }));
+    
+    setModifiedDates(prev => {
+      const newMods = { ...prev };
+      const isModified = newMods[dateStr] !== undefined;
+      
+      if (isModified) {
+        // If already modified, remove the modification (deselect/revert to original state)
+        delete newMods[dateStr];
+      } else {
+        // Toggle the booking state
+        newMods[dateStr] = !isCurrentlyBooked;
+      }
+      
+      return newMods;
+    });
   };
 
   const handleUpdate = async () => {

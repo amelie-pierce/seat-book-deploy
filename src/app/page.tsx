@@ -222,19 +222,13 @@ export default function Home() {
     [seatId: string]: { [dateStr: string]: boolean };
   }>({});
 
-  // Track dates booked by other users for each seat
-  // Format: { seatId: string[] } where array contains date strings booked by others
-  const [otherUsersBookings, setOtherUsersBookings] = useState<{
-    [seatId: string]: string[];
-  }>({});
-
   // Track temporary seats added via the plus button (not yet saved)
   const [tempSeats, setTempSeats] = useState<string[]>([]);
   const [showAddSeatDropdown, setShowAddSeatDropdown] = useState(false);
 
   // Track all seats' bookings to determine which are fully booked
   const [allSeatsBookings, setAllSeatsBookings] = useState<{
-    [seatId: string]: string[];
+    [seatId: string]: Array<{ date: string; userId: string }>;
   }>({});
 
   // Prepare all bookings data for the seat modal
@@ -394,74 +388,34 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser]);
 
-  // Load other users' bookings for seats that the current user has booked or is trying to book (temp seats)
+  // Load all seats' bookings when drawer is opened or when user/temp seats change
   useEffect(() => {
-    const loadOtherUsersBookings = async () => {
+    const loadAllSeatsBookings = async () => {
       if (!currentUser) {
-        setOtherUsersBookings({});
         return;
       }
 
       try {
-        // Get unique seat IDs from user's bookings AND temp seats
-        const userSeatIds = [...new Set([
-          ...userBookings.map(b => b.seatId),
-          ...tempSeats
-        ])];
+        // Determine which seats to load bookings for
+        let seatsToLoad: string[];
+        
+        if (showAddSeatDropdown) {
+          // When dropdown is open, load all seats
+          seatsToLoad = generateAllSeats(SEATING_CONFIG);
+        } else {
+          // Otherwise, only load seats that user has booked or added as temp
+          seatsToLoad = [...new Set([
+            ...userBookings.map(b => b.seatId),
+            ...tempSeats
+          ])];
+        }
 
-        if (userSeatIds.length === 0) {
-          setOtherUsersBookings({});
+        if (seatsToLoad.length === 0) {
+          setAllSeatsBookings({});
           return;
         }
 
-        const otherBookings: { [seatId: string]: string[] } = {};
-
-        // For each seat, get all bookings and filter for other users
-        for (const seatId of userSeatIds) {
-          // Get all dates to check
-          const datesToCheck = dateChips.dates.map(date => {
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-          });
-
-          const bookedByOthers: string[] = [];
-
-          // Check each date for bookings by other users
-          for (const dateStr of datesToCheck) {
-            const dateBookings = await bookingService.getBookingsForDate(dateStr);
-            const otherUserBooking = dateBookings.find(
-              b => b.seatId === seatId && b.userId !== currentUser && b.status === 'ACTIVE'
-            );
-
-            if (otherUserBooking) {
-              bookedByOthers.push(dateStr);
-            }
-          }
-
-          otherBookings[seatId] = bookedByOthers;
-        }
-
-        setOtherUsersBookings(otherBookings);
-      } catch (error) {
-        console.error("Error loading other users' bookings:", error);
-      }
-    };
-
-    loadOtherUsersBookings();
-  }, [currentUser, userBookings, dateChips.dates, tempSeats]);
-
-  // Load all seats' bookings when dropdown is opened
-  useEffect(() => {
-    const loadAllSeatsBookings = async () => {
-      if (!showAddSeatDropdown || !currentUser) {
-        return;
-      }
-
-      try {
-        const allSeats = generateAllSeats(SEATING_CONFIG);
-        const allBookings: { [seatId: string]: string[] } = {};
+        const allBookings: { [seatId: string]: Array<{ date: string; userId: string }> } = {};
 
         // Get all available dates
         const datesToCheck = dateChips.dates.map(date => {
@@ -471,22 +425,22 @@ export default function Home() {
           return `${year}-${month}-${day}`;
         });
 
-        // For each seat, check which dates are booked
-        for (const seatId of allSeats) {
-          const bookedDates: string[] = [];
+        // For each seat, check which dates are booked and by whom
+        for (const seatId of seatsToLoad) {
+          const seatBookings: Array<{ date: string; userId: string }> = [];
 
           for (const dateStr of datesToCheck) {
             const dateBookings = await bookingService.getBookingsForDate(dateStr);
-            const hasBooking = dateBookings.some(
+            const booking = dateBookings.find(
               b => b.seatId === seatId && b.status === 'ACTIVE'
             );
 
-            if (hasBooking) {
-              bookedDates.push(dateStr);
+            if (booking) {
+              seatBookings.push({ date: dateStr, userId: booking.userId });
             }
           }
 
-          allBookings[seatId] = bookedDates;
+          allBookings[seatId] = seatBookings;
         }
 
         setAllSeatsBookings(allBookings);
@@ -496,7 +450,7 @@ export default function Home() {
     };
 
     loadAllSeatsBookings();
-  }, [showAddSeatDropdown, currentUser, dateChips.dates]);
+  }, [showAddSeatDropdown, currentUser, dateChips.dates, userBookings, tempSeats]);
 
   const handleSeatClick = (seatId: string, event?: React.MouseEvent<HTMLButtonElement>) => {
     // Check seat availability - simplified for FULL_DAY bookings only
@@ -737,7 +691,9 @@ export default function Home() {
 
       // If the seat has bookings for ALL available dates, exclude it
       const isFullyBooked = allAvailableDates.length > 0 &&
-        allAvailableDates.every(date => seatBookedDates.includes(date));
+        allAvailableDates.every(date => 
+          seatBookedDates.some(booking => booking.date === date)
+        );
 
       return !isFullyBooked;
     });
@@ -954,7 +910,7 @@ export default function Home() {
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           {/* Logo */}
           <Image 
-            src="/lovechair.png" 
+            src="/logo.png" 
             alt="Flexi Seat Logo" 
             width={32}
             height={32}
@@ -1301,7 +1257,11 @@ export default function Home() {
                           handleDateToggle(seatId, dateStr, currentlyBooked)
                         }
                         modifiedDates={dateModifications[seatId] || {}}
-                        disabledDates={otherUsersBookings[seatId] || []}
+                        disabledDates={
+                          (allSeatsBookings[seatId] || [])
+                            .filter(booking => booking.userId !== currentUser)
+                            .map(booking => booking.date)
+                        }
                       />
                     );
                   })}
@@ -1325,7 +1285,11 @@ export default function Home() {
                           handleDateToggle(seatId, dateStr, currentlyBooked)
                         }
                         modifiedDates={dateModifications[seatId] || {}}
-                        disabledDates={otherUsersBookings[seatId] || []}
+                        disabledDates={
+                          (allSeatsBookings[seatId] || [])
+                            .filter(booking => booking.userId !== currentUser)
+                            .map(booking => booking.date)
+                        }
                       />
                     );
                   })}
@@ -1491,6 +1455,11 @@ export default function Home() {
         anchorPosition={modalAnchorPosition}
         allDates={dateChips.dates}
         allBookings={allBookingsForModal}
+        disabledDates={
+          (allSeatsBookings[mobileSeatModalSeatId] || [])
+            .filter(booking => booking.userId !== currentUser)
+            .map(booking => booking.date)
+        }
         onSuccess={handleModalSuccess}
       />
 

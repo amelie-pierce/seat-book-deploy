@@ -187,7 +187,7 @@ export default function SeatingLayout({
                     alignItems: "center",
                   }}
                 >
-                  <Typography fontWeight={600}>Location: </Typography>
+                  <Typography fontWeight={600} sx={{ display: { xs: "none", md: "inline-block" } }}>Location: </Typography>
                   <ZoneButton
                     label="Zone A"
                     onClick={() => handleZoneFocus("zone1", zoomToElement)}
@@ -207,9 +207,9 @@ export default function SeatingLayout({
                   <Button
                     variant="contained"
                     startIcon={
-                      <Image 
-                        src="/menu-open.png" 
-                        alt="Menu" 
+                      <Image
+                        src="/menu-open.png"
+                        alt="Menu"
                         width={20}
                         height={20}
                       />

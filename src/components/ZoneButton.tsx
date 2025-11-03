@@ -16,7 +16,7 @@ export default function ZoneButton({ label, onClick }: ZoneButtonProps) {
         backgroundColor: "#ECECEE",
         color: "#333",
         fontWeight: 600,
-        fontSize: "1rem",
+        fontSize: { xs: "0.875rem", md: "1rem" },
         textTransform: "none",
         borderRadius: 1,
         px: 1,
