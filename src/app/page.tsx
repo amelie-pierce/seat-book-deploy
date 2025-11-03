@@ -403,10 +403,11 @@ export default function Home() {
           // When dropdown is open, load all seats
           seatsToLoad = generateAllSeats(SEATING_CONFIG);
         } else {
-          // Otherwise, only load seats that user has booked or added as temp
+          // Otherwise, load seats that user has booked, added as temp, or currently viewing in modal
           seatsToLoad = [...new Set([
             ...userBookings.map(b => b.seatId),
-            ...tempSeats
+            ...tempSeats,
+            ...(mobileSeatModalOpen && mobileSeatModalSeatId ? [mobileSeatModalSeatId] : [])
           ])];
         }
 
@@ -450,7 +451,7 @@ export default function Home() {
     };
 
     loadAllSeatsBookings();
-  }, [showAddSeatDropdown, currentUser, dateChips.dates, userBookings, tempSeats]);
+  }, [showAddSeatDropdown, currentUser, dateChips.dates, userBookings, tempSeats, mobileSeatModalOpen, mobileSeatModalSeatId]);
 
   const handleSeatClick = (seatId: string, event?: React.MouseEvent<HTMLButtonElement>) => {
     // Check seat availability - simplified for FULL_DAY bookings only
