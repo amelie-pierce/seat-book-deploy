@@ -1,6 +1,6 @@
 import { Box, Typography, Chip, IconButton, Divider } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrashCan } from "@fortawesome/free-solid-svg-icons";
+import { faTrash } from "@fortawesome/free-solid-svg-icons";
 
 interface BookedSeatItemProps {
   seatId: string; // e.g., "D1", "D2", "D3"
@@ -45,7 +45,6 @@ export default function BookedSeatItem({
   return (
     <Box
       sx={{
-        border: '1px solid #E5E7EB',
         borderRadius: '8px',
         p: 2,
         mb: 2,
@@ -92,7 +91,7 @@ export default function BookedSeatItem({
             },
           }}
         >
-          <FontAwesomeIcon icon={faTrashCan} fontSize="small" />
+          <FontAwesomeIcon icon={faTrash} fontSize="small" />
         </IconButton>
       </Box>
 
@@ -154,9 +153,8 @@ export default function BookedSeatItem({
                 disabled={isDisabled}
                 sx={{
                   borderRadius: '6px',
-                  backgroundColor: isDisabled ? '#F3F4F6' : (isBooked ? '#FFE8DF' : '#E5E7EB'),
-                  color: isDisabled ? '#9CA3AF' : (isBooked ? '#FF6B35' : '#6B7280'),
-                  border: isModified && !isDisabled ? '2px solid #FF6B35' : 'none',
+                  backgroundColor: isDisabled ? '#F3F4F6' : (isBooked ? '#EAECF5' : '#ECECEE'),
+                  color: isDisabled ? '#9CA3AF' : (isBooked ? 'primary.main' : '#6B7280'),
                   fontWeight: 500,
                   fontSize: '0.75rem',
                   height: '32px',

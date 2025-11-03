@@ -8,8 +8,7 @@ import {
   Paper,
 } from "@mui/material";
 import { SEATING_CONFIG } from '../config/seatingConfig';
-import { bookingService } from '../services/bookingService';
-import { BookingRecord } from '../utils/bookingStorage';
+import { processSeatBookingModifications } from '../utils/bookingModifications';
 
 interface DesktopSeatModalProps {
   open: boolean;
@@ -108,37 +107,17 @@ export default function DesktopSeatModal({
       setIsUpdating(true);
 
       // Process all modifications for this seat
-      for (const [dateStr, shouldBook] of Object.entries(modifiedDates)) {
-        if (shouldBook) {
-          // Add new booking
-          await bookingService.createBooking(
-            currentUser,
-            seatId,
-            "FULL_DAY",
-            dateStr
-          );
-        } else {
-          // Remove booking - find the booking ID first
-          const userData = await bookingService.loadUserData(currentUser);
-          const bookingToRemove = userData.userBookings.find(
-            (b: BookingRecord) => b.seatId === seatId && b.date === dateStr
-          );
-          
-          if (bookingToRemove) {
-            await bookingService.cancelBooking(bookingToRemove.id, currentUser);
-          }
-        }
-      }
+      await processSeatBookingModifications(seatId, modifiedDates, currentUser);
 
       // Clear modifications
       setModifiedDates({});
       setIsUpdating(false);
-      
+
       // Call success callback to refresh data
       if (onSuccess) {
         onSuccess();
       }
-      
+
       // Close modal
       onClose();
     } catch (error) {
@@ -154,12 +133,12 @@ export default function DesktopSeatModal({
 
   const getSeatDisplayName = (seatId: string) => {
     const tableLetter = seatId.charAt(0);
-    const zoneName = SEATING_CONFIG.zones.zone1.tables.includes(tableLetter) 
-      ? 'Zone A' 
+    const zoneName = SEATING_CONFIG.zones.zone1.tables.includes(tableLetter)
+      ? 'Zone A'
       : 'Zone B';
     return `Desk ${seatId} - ${zoneName}`;
   };
-  
+
   return (
     <Popover
       open={open}
@@ -194,26 +173,13 @@ export default function DesktopSeatModal({
     >
       <Paper elevation={0} sx={{ p: 3 }}>
         {/* Header */}
-        <Box sx={{ mb: 3 }}>
+        <Box sx={{ mb: 2, pb: 2, borderBottom: 1, borderColor: 'grey.300' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Typography variant="h6" component="span">
                 {getSeatDisplayName(seatId)}
               </Typography>
             </Box>
-            {seatBookings.length === 0 ? (
-              <Chip
-                label="Free"
-                color="success"
-                sx={{ borderRadius: 2 }}
-              />
-            ) : (
-              <Chip
-                label="Booked"
-                color="error"
-                sx={{ borderRadius: 2 }}
-              />
-            )}
           </Box>
         </Box>
 
@@ -248,21 +214,21 @@ export default function DesktopSeatModal({
                   const dateStr = formatLocalDate(date);
                   const isOriginallyBooked = userBookedDates.includes(dateStr);
                   const isModified = modifiedDates[dateStr] !== undefined;
-                  
+
                   // Check if date is in the past
                   const today = new Date();
                   today.setHours(0, 0, 0, 0);
                   const isPastDate = date < today;
-                  
+
                   // Disable if booked by others OR if date is in the past
                   const isDisabled = disabledDates.includes(dateStr) || isPastDate;
-                  
+
                   // Calculate effective state after modifications
                   let isBooked = isOriginallyBooked;
                   if (isModified) {
                     isBooked = modifiedDates[dateStr]; // true = will be booked, false = will be unbooked
                   }
-                  
+
                   const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
                   const dayNumber = String(date.getDate()).padStart(2, '0');
                   const isSelected = dateStr === internalSelectedDate;
@@ -275,9 +241,8 @@ export default function DesktopSeatModal({
                       disabled={isDisabled}
                       sx={{
                         borderRadius: '6px',
-                        backgroundColor: isDisabled ? '#F3F4F6' : (isBooked ? '#FFE8DF' : '#E5E7EB'),
-                        color: isDisabled ? '#9CA3AF' : (isBooked ? '#FF6B35' : '#6B7280'),
-                        border: isSelected ? '2px solid #FF6B35' : (isModified && !isDisabled ? '2px solid #FF6B35' : 'none'),
+                        backgroundColor: isDisabled ? '#F3F4F6' : (isBooked ? '#EAECF5' : '#ECECEE'),
+                        color: isDisabled ? '#9CA3AF' : (isBooked ? 'primary.main' : '#6B7280'),
                         fontWeight: isSelected ? 600 : 500,
                         fontSize: '0.75rem',
                         height: '32px',
@@ -288,8 +253,8 @@ export default function DesktopSeatModal({
                           py: 0,
                         },
                         '&:hover': {
-                          backgroundColor: isDisabled 
-                            ? '#F3F4F6' 
+                          backgroundColor: isDisabled
+                            ? '#F3F4F6'
                             : (isBooked ? '#FFD4C4' : '#D1D5DB'),
                         },
                       }}
@@ -322,7 +287,7 @@ export default function DesktopSeatModal({
               },
             }}
           >
-            {isUpdating ? 'Updating...' : 'Update'}
+            {isUpdating ? 'Updating...' : 'Booking'}
           </Button>
         </Box>
       </Paper>

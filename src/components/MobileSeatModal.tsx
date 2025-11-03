@@ -16,8 +16,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCalendarDays } from "@fortawesome/free-solid-svg-icons";
 import { TransitionProps } from '@mui/material/transitions';
 import { format } from 'date-fns';
-import { bookingService } from '../services/bookingService';
-import { BookingRecord } from '../utils/bookingStorage';
+import { processSeatBookingModifications } from '../utils/bookingModifications';
 
 const userAvatar = {
   1234: 'https://i.pravatar.cc/150?img=1',
@@ -132,37 +131,17 @@ export default function MobileSeatModal({
       setIsUpdating(true);
 
       // Process all modifications for this seat
-      for (const [dateStr, shouldBook] of Object.entries(modifiedDates)) {
-        if (shouldBook) {
-          // Add new booking
-          await bookingService.createBooking(
-            currentUser,
-            seatId,
-            "FULL_DAY",
-            dateStr
-          );
-        } else {
-          // Remove booking - find the booking ID first
-          const userData = await bookingService.loadUserData(currentUser);
-          const bookingToRemove = userData.userBookings.find(
-            (b: BookingRecord) => b.seatId === seatId && b.date === dateStr
-          );
-          
-          if (bookingToRemove) {
-            await bookingService.cancelBooking(bookingToRemove.id, currentUser);
-          }
-        }
-      }
+      await processSeatBookingModifications(seatId, modifiedDates, currentUser);
 
       // Clear modifications
       setModifiedDates({});
       setIsUpdating(false);
-      
+
       // Call success callback to refresh data
       if (onSuccess) {
         onSuccess();
       }
-      
+
       // Close modal
       onClose();
     } catch (error) {
@@ -179,7 +158,7 @@ export default function MobileSeatModal({
   };
 
   const formatDate = (dateStr: string) => {
-    if(!dateStr) return '';
+    if (!dateStr) return '';
     const [year, month, day] = dateStr.split('-').map(Number);
     const localDate = new Date(year, month - 1, day);
     return format(localDate, 'EEEE, MMMM d, yyyy');
@@ -243,19 +222,6 @@ export default function MobileSeatModal({
               {getSeatDisplayName(seatId)}
             </Typography>
           </Box>
-          {isSeatAvailable ? (
-            <Chip
-              label="Free"
-              color="success"
-              sx={{ borderRadius: 2 }}
-            />
-          ) : (
-            <Chip
-              label="Booked"
-              color="error"
-              sx={{ borderRadius: 2 }}
-            />
-          )}
         </Box>
       </DialogTitle>
 
@@ -291,21 +257,21 @@ export default function MobileSeatModal({
                   const dateStr = formatLocalDate(date);
                   const isOriginallyBooked = userBookedDates.includes(dateStr);
                   const isModified = modifiedDates[dateStr] !== undefined;
-                  
+
                   // Check if date is in the past
                   const today = new Date();
                   today.setHours(0, 0, 0, 0);
                   const isPastDate = date < today;
-                  
+
                   // Disable if booked by others OR if date is in the past
                   const isDisabled = disabledDates.includes(dateStr) || isPastDate;
-                  
+
                   // Calculate effective state after modifications
                   let isBooked = isOriginallyBooked;
                   if (isModified) {
                     isBooked = modifiedDates[dateStr]; // true = will be booked, false = will be unbooked
                   }
-                  
+
                   const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
                   const dayNumber = String(date.getDate()).padStart(2, '0');
 
@@ -317,9 +283,8 @@ export default function MobileSeatModal({
                       disabled={isDisabled}
                       sx={{
                         borderRadius: '6px',
-                        backgroundColor: isDisabled ? '#F3F4F6' : (isBooked ? '#FFE8DF' : '#E5E7EB'),
-                        color: isDisabled ? '#9CA3AF' : (isBooked ? '#FF6B35' : '#6B7280'),
-                        border: isModified && !isDisabled ? '2px solid #FF6B35' : 'none',
+                        backgroundColor: isDisabled ? '#F3F4F6' : (isBooked ? '#EAECF5' : '#ECECEE'),
+                        color: isDisabled ? '#9CA3AF' : (isBooked ? 'primary.main' : '#6B7280'),
                         fontWeight: isModified ? 600 : 500,
                         fontSize: '0.75rem',
                         height: '32px',
@@ -330,8 +295,8 @@ export default function MobileSeatModal({
                           py: 0,
                         },
                         '&:hover': {
-                          backgroundColor: isDisabled 
-                            ? '#F3F4F6' 
+                          backgroundColor: isDisabled
+                            ? '#F3F4F6'
                             : (isBooked ? '#FFD4C4' : '#D1D5DB'),
                         },
                       }}
@@ -349,14 +314,14 @@ export default function MobileSeatModal({
               <Typography variant="body2" sx={{ mb: 2, fontWeight: 600 }}>
                 Current Bookings:
               </Typography>
-              
+
               {seatBookings.map((booking, index) => (
-                <Box 
+                <Box
                   key={index}
-                  sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: 2, 
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 2,
                     mb: 2,
                     p: 1.5,
                     backgroundColor: booking.userId === currentUser ? 'primary.50' : 'grey.50',
@@ -378,9 +343,9 @@ export default function MobileSeatModal({
                     <Typography variant="body2" fontWeight="bold">
                       {booking.userId}
                       {booking.userId === currentUser && (
-                        <Chip 
-                          label="You" 
-                          size="small" 
+                        <Chip
+                          label="You"
+                          size="small"
                           color="primary"
                           sx={{ ml: 1, height: 20, fontSize: '0.7rem' }}
                         />
@@ -460,7 +425,7 @@ export default function MobileSeatModal({
               },
             }}
           >
-            {isUpdating ? 'Updating...' : 'Update'}
+            {isUpdating ? 'Updating...' : 'Booking'}
           </Button>
         )}
       </DialogActions>

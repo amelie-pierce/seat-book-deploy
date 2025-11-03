@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   Container,
   TextField,
@@ -8,8 +9,6 @@ import {
   Typography,
   Box,
 } from "@mui/material";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCouch } from "@fortawesome/free-solid-svg-icons";
 import { vercelDataService } from "../../services/vercelDataService";
 
 export default function AuthPage() {
@@ -101,9 +100,11 @@ export default function AuthPage() {
             mb: 4,
           }}
         >
-          <FontAwesomeIcon
-            icon={faCouch}
-            style={{ fontSize: "32px", color: "#5865F2" }}
+          <Image
+            src="/lovechair.png"
+            alt="Flexi Seat Logo"
+            width={32}
+            height={32}
           />
           <Typography
             variant="h5"

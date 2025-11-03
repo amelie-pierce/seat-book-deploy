@@ -30,6 +30,7 @@ import { SEATING_CONFIG, generateAllSeats } from "../config/seatingConfig";
 import { bookingService } from "../services/bookingService";
 import { vercelDataService } from "../services/vercelDataService";
 import { BookingRecord } from "../utils/bookingStorage";
+import { processMultipleSeatBookingModifications } from "../utils/bookingModifications";
 
 const userAvatar = {
   1234: 'https://i.pravatar.cc/150?img=1',
@@ -818,29 +819,7 @@ export default function Home() {
       setIsLoadingBookings(true);
 
       // Process all modifications (including temp seats)
-      for (const [seatId, modifications] of Object.entries(dateModifications)) {
-        for (const [dateStr, shouldBook] of Object.entries(modifications)) {
-          if (shouldBook) {
-            // Add new booking
-            await bookingService.createBooking(
-              currentUser,
-              seatId,
-              "FULL_DAY",
-              dateStr
-            );
-          } else {
-            // Remove booking - find the booking ID first
-            const userData = await bookingService.loadUserData(currentUser);
-            const bookingToRemove = userData.userBookings.find(
-              (b: BookingRecord) => b.seatId === seatId && b.date === dateStr
-            );
-
-            if (bookingToRemove) {
-              await bookingService.cancelBooking(bookingToRemove.id, currentUser);
-            }
-          }
-        }
-      }
+      await processMultipleSeatBookingModifications(dateModifications, currentUser);
 
       // Clear modifications and temp seats
       setDateModifications({});
@@ -967,6 +946,13 @@ export default function Home() {
         }}
       >
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          {/* Logo */}
+          <Image 
+            src="/lovechair.png" 
+            alt="Flexi Seat Logo" 
+            width={32}
+            height={32}
+          />
           <Typography variant="h5" component="h3" color="#000000">
             Flexi Seat
           </Typography>
@@ -1196,8 +1182,8 @@ export default function Home() {
               xs: "transform 0.3s ease-in-out",
               md: "width 0.3s ease-in-out, max-width 0.3s ease-in-out",
             },
-            borderLeft: drawerOpen ? { xs: "none", md: "1px solid #CDCFD0" } : "none",
-            backgroundColor: "#fff",
+            backgroundColor: "#F7F8FA",
+            boxShadow: drawerOpen ? { xs: "none", md: "-4px 0 12px rgba(0, 0, 0, 0.1)" } : "none",
             display: { xs: "flex", md: "flex" },
             flexDirection: "column",
             position: { xs: "fixed", md: "relative" },
