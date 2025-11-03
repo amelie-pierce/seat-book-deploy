@@ -1,5 +1,6 @@
 import { Box, Typography, Chip, IconButton, Divider } from "@mui/material";
-import { Delete as DeleteIcon } from "@mui/icons-material";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faTrashCan } from "@fortawesome/free-solid-svg-icons";
 
 interface BookedSeatItemProps {
   seatId: string; // e.g., "D1", "D2", "D3"
@@ -91,7 +92,7 @@ export default function BookedSeatItem({
             },
           }}
         >
-          <DeleteIcon fontSize="small" />
+          <FontAwesomeIcon icon={faTrashCan} fontSize="small" />
         </IconButton>
       </Box>
 

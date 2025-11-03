@@ -28,6 +28,7 @@ interface DesktopSeatModalProps {
     userId: string;
     date: string;
   }>; // All bookings across all dates
+  onSuccess?: () => void; // Callback after successful booking update
 }
 
 export default function DesktopSeatModal({
@@ -40,6 +41,7 @@ export default function DesktopSeatModal({
   seatBookings,
   allDates = [],
   allBookings = [],
+  onSuccess,
 }: DesktopSeatModalProps) {
   const [internalSelectedDate, setInternalSelectedDate] = useState<string>(selectedDate);
   const [modifiedDates, setModifiedDates] = useState<{ [dateStr: string]: boolean }>({});
@@ -131,6 +133,11 @@ export default function DesktopSeatModal({
       // Clear modifications
       setModifiedDates({});
       setIsUpdating(false);
+      
+      // Call success callback to refresh data
+      if (onSuccess) {
+        onSuccess();
+      }
       
       // Close modal
       onClose();

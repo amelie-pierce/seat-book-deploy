@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useState, useMemo, useEffect } from "react";
+import Image from "next/image";
 import {
   Container,
   Box,
@@ -14,13 +15,13 @@ import {
   Autocomplete,
   TextField,
 } from "@mui/material";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  ExitToApp as LogoutIcon,
-  Home as HomeIcon,
-  Menu as MenuIcon,
-  Add as AddIcon,
-  Work as BriefcaseIcon,
-} from "@mui/icons-material";
+  faRightFromBracket,
+  faHouse,
+  faPlus,
+  faBriefcase,
+} from "@fortawesome/free-solid-svg-icons";
 import SeatingLayout from "../components/SeatingLayout";
 import SeatModal from "../components/SeatModal";
 import BookedSeatItem from "../components/BookedSeatItem";
@@ -253,7 +254,7 @@ export default function Home() {
   // Disable animations during window resize
   useEffect(() => {
     let resizeTimer: NodeJS.Timeout;
-    
+
     const handleResize = () => {
       setIsResizing(true);
       clearTimeout(resizeTimer);
@@ -400,7 +401,7 @@ export default function Home() {
           ...userBookings.map(b => b.seatId),
           ...tempSeats
         ])];
-        
+
         if (userSeatIds.length === 0) {
           setOtherUsersBookings({});
           return;
@@ -426,7 +427,7 @@ export default function Home() {
             const otherUserBooking = dateBookings.find(
               b => b.seatId === seatId && b.userId !== currentUser && b.status === 'ACTIVE'
             );
-            
+
             if (otherUserBooking) {
               bookedByOthers.push(dateStr);
             }
@@ -472,7 +473,7 @@ export default function Home() {
             const hasBooking = dateBookings.some(
               b => b.seatId === seatId && b.status === 'ACTIVE'
             );
-            
+
             if (hasBooking) {
               bookedDates.push(dateStr);
             }
@@ -658,12 +659,12 @@ export default function Home() {
     try {
       // Reload user data to get full booking records with IDs
       const userData = await bookingService.loadUserData(currentUser);
-      
+
       // Find all booking IDs for this seat
       const bookingsToDelete = userData.userBookings.filter(
         (b: BookingRecord) => b.seatId === seatId
       );
-      
+
       // Delete each booking
       for (const booking of bookingsToDelete) {
         await bookingService.cancelBooking(booking.id, currentUser);
@@ -705,7 +706,7 @@ export default function Home() {
   const getAvailableSeatsForDropdown = () => {
     const allSeats = generateAllSeats(SEATING_CONFIG);
     const userSeatIds = [...new Set(userBookings.map(b => b.seatId))];
-    
+
     // Get all available dates (working days)
     const allAvailableDates = dateChips.dates.map(date => {
       const year = date.getFullYear();
@@ -713,7 +714,7 @@ export default function Home() {
       const day = String(date.getDate()).padStart(2, '0');
       return `${year}-${month}-${day}`;
     });
-    
+
     // Filter out seats that are:
     // 1. Already in user's bookings
     // 2. Already in temp seats
@@ -723,14 +724,14 @@ export default function Home() {
       if (userSeatIds.includes(seatId) || tempSeats.includes(seatId)) {
         return false;
       }
-      
+
       // Check if seat is fully booked for all dates
       const seatBookedDates = allSeatsBookings[seatId] || [];
-      
+
       // If the seat has bookings for ALL available dates, exclude it
-      const isFullyBooked = allAvailableDates.length > 0 && 
-                           allAvailableDates.every(date => seatBookedDates.includes(date));
-      
+      const isFullyBooked = allAvailableDates.length > 0 &&
+        allAvailableDates.every(date => seatBookedDates.includes(date));
+
       return !isFullyBooked;
     });
   };
@@ -760,13 +761,13 @@ export default function Home() {
       const newMods = { ...prev };
       const seatMods = newMods[seatId] || {};
       const newSeatMods = { ...seatMods };
-      
+
       // Check if there's already a modification for this date
       const hasModification = newSeatMods[dateStr] !== undefined;
-      
+
       // Calculate what the effective state will be after this toggle
       let willBeBooked = false;
-      
+
       if (hasModification) {
         // If already modified, toggling will revert to original state
         willBeBooked = currentlyBooked;
@@ -781,7 +782,7 @@ export default function Home() {
           willBeBooked = true;
         }
       }
-      
+
       // If this seat will be booked on this date, unbook any other seats on the same date
       if (willBeBooked) {
         // Find all other seats that are booked (or will be booked) on this date
@@ -794,7 +795,7 @@ export default function Home() {
             newMods[booking.seatId][dateStr] = false; // Mark for removal
           }
         });
-        
+
         // Also check for any seats that are not originally booked but marked for addition
         Object.entries(newMods).forEach(([otherSeatId, otherMods]) => {
           if (otherSeatId !== seatId && otherMods[dateStr] === true) {
@@ -803,7 +804,7 @@ export default function Home() {
           }
         });
       }
-      
+
       newMods[seatId] = newSeatMods;
       return newMods;
     });
@@ -833,7 +834,7 @@ export default function Home() {
             const bookingToRemove = userData.userBookings.find(
               (b: BookingRecord) => b.seatId === seatId && b.date === dateStr
             );
-            
+
             if (bookingToRemove) {
               await bookingService.cancelBooking(bookingToRemove.id, currentUser);
             }
@@ -911,6 +912,20 @@ export default function Home() {
     [selectedSeatsFromClick, selectedSeatsFromDropdown]
   );
 
+  // Handle successful booking updates - refresh data
+  const handleModalSuccess = useCallback(async () => {
+    // Reload user bookings
+    if (currentUser) {
+      const userData = await bookingService.loadUserData(currentUser);
+      setUserBookings(userData.userBookings);
+    }
+
+    // Refresh current date's booking data
+    if (selectedDate) {
+      await handleDateClick(selectedDate);
+    }
+  }, [currentUser, selectedDate, handleDateClick]);
+
   // Show loading state while checking authentication or loading bookings
   if (isLoading || isLoadingBookings) {
     return (
@@ -979,8 +994,9 @@ export default function Home() {
           </Box>
           <IconButton
             onClick={handleLogout}
+            sx={{ fontSize: '1.2rem' }}
           >
-            <LogoutIcon />
+            <FontAwesomeIcon icon={faRightFromBracket} />
           </IconButton>
         </Box>
       </Box>
@@ -1001,10 +1017,10 @@ export default function Home() {
           width: "100%",
         }}
       >
-        <Typography 
+        <Typography
           fontWeight={600}
           fontSize="0.95rem"
-          sx={{ 
+          sx={{
             minWidth: "fit-content",
             pr: 0.5,
             color: "#1F2937",
@@ -1068,7 +1084,7 @@ export default function Home() {
             // Determine icon based on whether user has booking for this date
             const userBookingForDate = userBookings.find(b => b.date === dateStr);
             const hasBooking = !!userBookingForDate;
-            const IconComponent = hasBooking ? BriefcaseIcon : HomeIcon;
+            const iconToUse = hasBooking ? faBriefcase : faHouse;
 
             // Set colors: white for selected, green for unselected with booking, gray for no booking
             const chipColor = isCurrentDate ? "#fff" : "#6B7280";
@@ -1078,7 +1094,7 @@ export default function Home() {
               <Chip
                 clickable={!isPastDate}
                 key={dateStr}
-                icon={<IconComponent sx={{ fontSize: '1rem', color: iconColor }} />}
+                icon={<FontAwesomeIcon icon={iconToUse} style={{ fontSize: '1rem', color: iconColor }} />}
                 label={displayLabel}
                 sx={{
                   cursor: isPastDate ? "not-allowed" : "pointer",
@@ -1223,209 +1239,190 @@ export default function Home() {
                     minHeight: "56px",
                   }}
                 >
-                <IconButton
-                  onClick={handleDrawerToggle}
-                  sx={{
-                    position: "absolute",
-                    left: 8,
-                    color: "#fff",
-                    "&:hover": {
-                      backgroundColor: "rgba(255,255,255,0.1)",
-                    },
-                  }}
-                >
-                  <MenuIcon />
-                </IconButton>
-                <Typography
-                  variant="h6"
-                  sx={{
-                    fontWeight: 600,
-                    fontSize: "1rem",
-                  }}
-                >
-                  My Booked List
-                </Typography>
-              </Box>
-
-              {/* Drawer Content */}
-              <Box
-                sx={{
-                  flex: 1,
-                  overflow: "auto",
-                  p: 3,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 2,
-                }}
-              >
-                {/* Group bookings by seat */}
-                {Object.entries(
-                  userBookings.reduce((acc, booking) => {
-                    if (!acc[booking.seatId]) {
-                      acc[booking.seatId] = [];
-                    }
-                    acc[booking.seatId].push(booking.date);
-                    return acc;
-                  }, {} as Record<string, string[]>)
-                ).map(([seatId, bookedDates]) => {
-                  // Extract table letter from seatId (e.g., "A1" -> "A")
-                  const tableLetter = seatId.charAt(0);
-                  
-                  // Determine zone based on table letter
-                  const zone = SEATING_CONFIG.zones.zone1.tables.includes(tableLetter) 
-                    ? "A" 
-                    : "B";
-
-                  return (
-                    <BookedSeatItem
-                      key={seatId}
-                      seatId={seatId}
-                      zone={zone}
-                      bookedDates={bookedDates}
-                      allDates={dateChips.dates}
-                      onDelete={() => handleDeleteSeatBookings(seatId)}
-                      onDateToggle={(dateStr, currentlyBooked) => 
-                        handleDateToggle(seatId, dateStr, currentlyBooked)
-                      }
-                      modifiedDates={dateModifications[seatId] || {}}
-                      disabledDates={otherUsersBookings[seatId] || []}
-                    />
-                  );
-                })}
-
-                {/* Temporary seats (not yet saved) */}
-                {tempSeats.map((seatId) => {
-                  const tableLetter = seatId.charAt(0);
-                  const zone = SEATING_CONFIG.zones.zone1.tables.includes(tableLetter) 
-                    ? "A" 
-                    : "B";
-
-                  return (
-                    <BookedSeatItem
-                      key={`temp-${seatId}`}
-                      seatId={seatId}
-                      zone={zone}
-                      bookedDates={[]} // No dates booked yet
-                      allDates={dateChips.dates}
-                      onDelete={() => handleDeleteTempSeat(seatId)}
-                      onDateToggle={(dateStr, currentlyBooked) => 
-                        handleDateToggle(seatId, dateStr, currentlyBooked)
-                      }
-                      modifiedDates={dateModifications[seatId] || {}}
-                      disabledDates={otherUsersBookings[seatId] || []}
-                    />
-                  );
-                })}
-
-                {userBookings.length === 0 && tempSeats.length === 0 && (
-                  <Box
-                    sx={{
-                      textAlign: "center",
-                      py: 8,
-                      color: "#6B7280",
-                    }}
-                  >
-                    <Typography variant="body1">
-                      No bookings yet
-                    </Typography>
-                  </Box>
-                )}
-              </Box>
-
-              {/* Drawer Footer with Buttons and Dropdown */}
-              <Box
-                sx={{
-                  backgroundColor: "#fff",
-                  borderTop: "1px solid #E5E7EB",
-                }}
-              >
-                {/* Add Seat Dropdown */}
-                {showAddSeatDropdown && (
-                  <Box
-                    sx={{
-                      p: 2,
-                      borderBottom: "1px solid #E5E7EB",
-                    }}
-                  >
-                    <Autocomplete
-                      options={getAvailableSeatsForDropdown()}
-                      getOptionLabel={(seatId) => {
-                        const tableLetter = seatId.charAt(0);
-                        const zone = SEATING_CONFIG.zones.zone1.tables.includes(tableLetter) 
-                          ? "A" 
-                          : "B";
-                        return `Desk ${seatId} - Zone ${zone}`;
-                      }}
-                      onChange={(_, value) => {
-                        if (value) {
-                          handleAddTempSeat(value);
-                        }
-                      }}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
-                          placeholder="Search and select a seat..."
-                          size="small"
-                          sx={{
-                            "& .MuiOutlinedInput-root": {
-                              "& fieldset": {
-                                borderColor: "#FF6B35",
-                              },
-                              "&:hover fieldset": {
-                                borderColor: "#E55A2B",
-                              },
-                              "&.Mui-focused fieldset": {
-                                borderColor: "#FF6B35",
-                              },
-                            },
-                          }}
-                        />
-                      )}
-                    />
-                  </Box>
-                )}
-
-                {/* Button Row */}
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    p: 2,
-                  }}
-                >
-                  {/* Close Button - Left */}
-                  <Button
-                    variant="contained"
+                  <IconButton
                     onClick={handleDrawerToggle}
                     sx={{
-                      textTransform: "none",
-                      px: 4,
-                      py: 1,
-                      backgroundColor: "#E5E7EB",
-                      color: "#374151",
-                      boxShadow: "none",
+                      position: "absolute",
+                      left: 8,
+                      color: "#fff",
                       "&:hover": {
-                        backgroundColor: "#D1D5DB",
-                        boxShadow: "none",
+                        backgroundColor: "rgba(255,255,255,0.1)",
                       },
                     }}
                   >
-                    Close
-                  </Button>
+                    <Image 
+                      src="/menu-close.png" 
+                      alt="Menu" 
+                      width={20}
+                      height={20}
+                    />
+                  </IconButton>
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      fontWeight: 600,
+                      fontSize: "1rem",
+                    }}
+                  >
+                    My Booked List
+                  </Typography>
+                </Box>
 
-                  {/* Right Side Buttons */}
-                  <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-                    {/* Plus Button */}
+                {/* Drawer Content */}
+                <Box
+                  sx={{
+                    flex: 1,
+                    overflow: "auto",
+                    p: 3,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
+                  }}
+                >
+                  {/* Group bookings by seat */}
+                  {Object.entries(
+                    userBookings.reduce((acc, booking) => {
+                      if (!acc[booking.seatId]) {
+                        acc[booking.seatId] = [];
+                      }
+                      acc[booking.seatId].push(booking.date);
+                      return acc;
+                    }, {} as Record<string, string[]>)
+                  ).map(([seatId, bookedDates]) => {
+                    // Extract table letter from seatId (e.g., "A1" -> "A")
+                    const tableLetter = seatId.charAt(0);
+
+                    // Determine zone based on table letter
+                    const zone = SEATING_CONFIG.zones.zone1.tables.includes(tableLetter)
+                      ? "A"
+                      : "B";
+
+                    return (
+                      <BookedSeatItem
+                        key={seatId}
+                        seatId={seatId}
+                        zone={zone}
+                        bookedDates={bookedDates}
+                        allDates={dateChips.dates}
+                        onDelete={() => handleDeleteSeatBookings(seatId)}
+                        onDateToggle={(dateStr, currentlyBooked) =>
+                          handleDateToggle(seatId, dateStr, currentlyBooked)
+                        }
+                        modifiedDates={dateModifications[seatId] || {}}
+                        disabledDates={otherUsersBookings[seatId] || []}
+                      />
+                    );
+                  })}
+
+                  {/* Temporary seats (not yet saved) */}
+                  {tempSeats.map((seatId) => {
+                    const tableLetter = seatId.charAt(0);
+                    const zone = SEATING_CONFIG.zones.zone1.tables.includes(tableLetter)
+                      ? "A"
+                      : "B";
+
+                    return (
+                      <BookedSeatItem
+                        key={`temp-${seatId}`}
+                        seatId={seatId}
+                        zone={zone}
+                        bookedDates={[]} // No dates booked yet
+                        allDates={dateChips.dates}
+                        onDelete={() => handleDeleteTempSeat(seatId)}
+                        onDateToggle={(dateStr, currentlyBooked) =>
+                          handleDateToggle(seatId, dateStr, currentlyBooked)
+                        }
+                        modifiedDates={dateModifications[seatId] || {}}
+                        disabledDates={otherUsersBookings[seatId] || []}
+                      />
+                    );
+                  })}
+
+                  {userBookings.length === 0 && tempSeats.length === 0 && (
+                    <Box
+                      sx={{
+                        textAlign: "center",
+                        py: 8,
+                        color: "#6B7280",
+                      }}
+                    >
+                      <Typography variant="body1">
+                        No bookings yet
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+
+                {/* Drawer Footer with Buttons and Dropdown */}
+                <Box
+                  sx={{
+                    backgroundColor: "#fff",
+                    borderTop: "1px solid #E5E7EB",
+                  }}
+                >
+                  {/* Add Seat Dropdown */}
+                  {showAddSeatDropdown && (
+                    <Box
+                      sx={{
+                        p: 2,
+                        borderBottom: "1px solid #E5E7EB",
+                      }}
+                    >
+                      <Autocomplete
+                        options={getAvailableSeatsForDropdown()}
+                        getOptionLabel={(seatId) => {
+                          const tableLetter = seatId.charAt(0);
+                          const zone = SEATING_CONFIG.zones.zone1.tables.includes(tableLetter)
+                            ? "A"
+                            : "B";
+                          return `Desk ${seatId} - Zone ${zone}`;
+                        }}
+                        onChange={(_, value) => {
+                          if (value) {
+                            handleAddTempSeat(value);
+                          }
+                        }}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            placeholder="Search and select a seat..."
+                            size="small"
+                            sx={{
+                              "& .MuiOutlinedInput-root": {
+                                "& fieldset": {
+                                  borderColor: "#FF6B35",
+                                },
+                                "&:hover fieldset": {
+                                  borderColor: "#E55A2B",
+                                },
+                                "&.Mui-focused fieldset": {
+                                  borderColor: "#FF6B35",
+                                },
+                              },
+                            }}
+                          />
+                        )}
+                      />
+                    </Box>
+                  )}
+
+                  {/* Button Row */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      p: 2,
+                    }}
+                  >
+                    {/* Close Button - Left */}
                     <Button
                       variant="contained"
-                      onClick={() => setShowAddSeatDropdown(!showAddSeatDropdown)}
+                      onClick={handleDrawerToggle}
                       sx={{
                         textTransform: "none",
-                        minWidth: "auto",
-                        width: "40px",
-                        height: "40px",
-                        p: 0,
+                        px: 4,
+                        py: 1,
                         backgroundColor: "#E5E7EB",
                         color: "#374151",
                         boxShadow: "none",
@@ -1435,35 +1432,59 @@ export default function Home() {
                         },
                       }}
                     >
-                      <AddIcon />
+                      Close
                     </Button>
 
-                    {/* Update Button */}
-                    <Button
-                      variant="contained"
-                      onClick={handleUpdateBookings}
-                      disabled={(Object.keys(dateModifications).length === 0 && tempSeats.length === 0) || isLoadingBookings}
-                      sx={{
-                        textTransform: "none",
-                        px: 4,
-                        py: 1,
-                        backgroundColor: "#FF6B35",
-                        "&:hover": {
-                          backgroundColor: "#E55A2B",
-                        },
-                        "&:disabled": {
-                          backgroundColor: "#D1D5DB",
-                          color: "#9CA3AF",
-                        },
-                      }}
-                    >
-                      {isLoadingBookings ? "Updating..." : "Update"}
-                    </Button>
+                    {/* Right Side Buttons */}
+                    <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+                      {/* Plus Button */}
+                      <Button
+                        variant="contained"
+                        onClick={() => setShowAddSeatDropdown(!showAddSeatDropdown)}
+                        sx={{
+                          textTransform: "none",
+                          minWidth: "auto",
+                          width: "40px",
+                          height: "40px",
+                          p: 0,
+                          backgroundColor: "#E5E7EB",
+                          color: "#374151",
+                          boxShadow: "none",
+                          "&:hover": {
+                            backgroundColor: "#D1D5DB",
+                            boxShadow: "none",
+                          },
+                        }}
+                      >
+                        <FontAwesomeIcon icon={faPlus} />
+                      </Button>
+
+                      {/* Update Button */}
+                      <Button
+                        variant="contained"
+                        onClick={handleUpdateBookings}
+                        disabled={(Object.keys(dateModifications).length === 0 && tempSeats.length === 0) || isLoadingBookings}
+                        sx={{
+                          textTransform: "none",
+                          px: 4,
+                          py: 1,
+                          backgroundColor: "#FF6B35",
+                          "&:hover": {
+                            backgroundColor: "#E55A2B",
+                          },
+                          "&:disabled": {
+                            backgroundColor: "#D1D5DB",
+                            color: "#9CA3AF",
+                          },
+                        }}
+                      >
+                        {isLoadingBookings ? "Updating..." : "Update"}
+                      </Button>
+                    </Box>
                   </Box>
                 </Box>
-              </Box>
-            </>
-          )}
+              </>
+            )}
           </Box>
         </Box>
       </Box>
@@ -1478,6 +1499,7 @@ export default function Home() {
         anchorPosition={modalAnchorPosition}
         allDates={dateChips.dates}
         allBookings={allBookingsForModal}
+        onSuccess={handleModalSuccess}
       />
 
       {/* Booking Error Snackbar */}

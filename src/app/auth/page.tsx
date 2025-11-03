@@ -7,19 +7,14 @@ import {
   Button,
   Typography,
   Box,
-  Alert,
-  Card,
-  CardContent,
-  CardActions,
 } from "@mui/material";
-import { Person as PersonIcon } from "@mui/icons-material";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCouch } from "@fortawesome/free-solid-svg-icons";
 import { vercelDataService } from "../../services/vercelDataService";
 
 export default function AuthPage() {
   const [userId, setUserId] = useState("");
   const [error, setError] = useState("");
-  const [isExistingUser, setIsExistingUser] = useState(false);
-  const [userEmail, setUserEmail] = useState("");
   const router = useRouter();
 
   // Check if user is already authenticated on component mount
@@ -76,103 +71,112 @@ export default function AuthPage() {
     }
   };
 
-  const handleUserIdChange = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handleUserIdChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newUserId = event.target.value;
     setUserId(newUserId);
     if (error) setError(""); // Clear error when user starts typing
-
-    // Check if user exists for display purposes
-    if (newUserId.trim().length >= 3) {
-      try {
-        const existingUser = await vercelDataService.getUserById(
-          newUserId.trim()
-        );
-        if (existingUser) {
-          setIsExistingUser(true);
-          setUserEmail(existingUser.email);
-        } else {
-          setIsExistingUser(false);
-          setUserEmail("");
-        }
-      } catch (error) {
-        console.error("Error checking user:", error);
-      }
-    } else {
-      setIsExistingUser(false);
-      setUserEmail("");
-    }
   };
 
   return (
     <Container
-      maxWidth="sm"
+      maxWidth={false}
       sx={{
         minHeight: "100vh",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         py: 4,
+        backgroundColor: "#f5f5f5",
       }}
     >
-      <Card
-        sx={{
-          width: "100%",
-          borderRadius: 3,
-          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)",
-        }}
+      <Box
       >
-        <CardContent sx={{ px: 4, pt: 4, pb: 2 }}>
+        {/* Flexi Seat Header with Icon */}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 1.5,
+            mb: 4,
+          }}
+        >
+          <FontAwesomeIcon
+            icon={faCouch}
+            style={{ fontSize: "32px", color: "#5865F2" }}
+          />
           <Typography
-            variant="h6"
-            gutterBottom
-            sx={{ fontWeight: 500, textAlign: "center", pb: 2 }}
+            variant="h5"
+            sx={{
+              fontWeight: 600,
+              color: "#333",
+            }}
           >
-            Sign In Now!
+            Flexi Seat
+          </Typography>
+        </Box>
+        <Box
+          sx={{
+            width: "100%",
+            maxWidth: 440,
+            borderRadius: 2,
+            px: 6,
+            py: 4,
+            textAlign: "center",
+            backgroundColor: "white",
+          }}
+        >
+          {/* Sign in Now! */}
+          <Typography
+            variant="h5"
+            sx={{
+              fontWeight: 600,
+              color: "#333",
+              mb: 4,
+            }}
+          >
+            Sign in Now !
           </Typography>
 
-          {/* {isExistingUser && userEmail && (
-            <Alert severity="success" sx={{ mb: 3, borderRadius: 2 }}>
-              <Typography variant="body2">
-                <strong>Welcome back!</strong> ({userEmail})
-              </Typography>
-            </Alert>
-          )} */}
-
+          {/* Form */}
           <Box component="form" onSubmit={handleSubmit}>
             <TextField
               autoFocus
-              label="Enter your pin code"
+              placeholder="Enter your PIN Code"
               type="text"
               fullWidth
+              size="small"
               value={userId}
               onChange={handleUserIdChange}
               error={!!error}
               helperText={error}
+              sx={{
+                mb: 3,
+                "& .MuiOutlinedInput-root": {
+                  backgroundColor: "#fafafa",
+                },
+              }}
             />
-          </Box>
-        </CardContent>
 
-        {/* Actions */}
-        <CardActions sx={{ px: 4, pb: 4, gap: 2, flexDirection: "column" }}>
-          <Button
-            onClick={handleSubmit}
-            variant="contained"
-            disabled={!userId.trim() || userId.trim().length < 3}
-            fullWidth
-            size="large"
-            sx={{
-              borderRadius: 2,
-              fontWeight: 600,
-              backgroundColor: "#FF5208",
-              boxShadow: "none",
-            }}
-          >
-            Sign In
-          </Button>
-        </CardActions>
-      </Card>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={!userId.trim() || userId.trim().length < 3}
+              fullWidth
+              sx={{
+                fontWeight: 600,
+                textTransform: "none",
+                boxShadow: "none",
+                "&:hover": {
+                  boxShadow: "none",
+                },
+              }}
+            >
+              Sign In
+            </Button>
+          </Box>
+        </Box>
+      </Box>
     </Container>
   );
 }

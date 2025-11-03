@@ -12,7 +12,8 @@ import {
   Slide,
   Avatar,
 } from "@mui/material";
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCalendarDays } from "@fortawesome/free-solid-svg-icons";
 import { TransitionProps } from '@mui/material/transitions';
 import { format } from 'date-fns';
 import { bookingService } from '../services/bookingService';
@@ -55,6 +56,7 @@ interface MobileSeatModalProps {
     userId: string;
     date: string;
   }>;
+  onSuccess?: () => void; // Callback after successful booking update
 }
 
 export default function MobileSeatModal({
@@ -66,6 +68,7 @@ export default function MobileSeatModal({
   seatBookings,
   allDates = [],
   allBookings = [],
+  onSuccess,
 }: MobileSeatModalProps) {
   const [modifiedDates, setModifiedDates] = useState<{ [dateStr: string]: boolean }>({});
   const [isUpdating, setIsUpdating] = useState(false);
@@ -154,6 +157,11 @@ export default function MobileSeatModal({
       // Clear modifications
       setModifiedDates({});
       setIsUpdating(false);
+      
+      // Call success callback to refresh data
+      if (onSuccess) {
+        onSuccess();
+      }
       
       // Close modal
       onClose();
@@ -387,7 +395,7 @@ export default function MobileSeatModal({
             </Box>
 
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, pt: 2, borderTop: 1, borderColor: 'grey.300' }}>
-              <CalendarTodayIcon fontSize="small" />
+              <FontAwesomeIcon icon={faCalendarDays} fontSize="small" />
               <Typography variant="body2" color="text.secondary">
                 {formatDate(selectedDate)}
               </Typography>
@@ -399,7 +407,7 @@ export default function MobileSeatModal({
           <>
             <Box sx={{ borderTop: 1, borderColor: 'grey.300', pt: 2, mb: 3 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                <CalendarTodayIcon fontSize="small" />
+                <FontAwesomeIcon icon={faCalendarDays} fontSize="small" />
                 <span>Available</span>
               </Box>
               <Typography variant="body1" color="grey.500">

@@ -19,6 +19,7 @@ interface SeatModalProps {
     userId: string;
     date: string;
   }>; // All bookings across all dates
+  onSuccess?: () => void; // Callback after successful booking update
 }
 
 export default function SeatModal({
@@ -31,6 +32,7 @@ export default function SeatModal({
   anchorPosition,
   allDates = [],
   allBookings = [],
+  onSuccess,
 }: SeatModalProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -56,6 +58,7 @@ export default function SeatModal({
     seatBookings, // Pass all bookings for this seat
     allDates, // Pass all available dates
     allBookings, // Pass all bookings across dates
+    onSuccess,
   };
 
   // Desktop modal props (no currentUserBooking needed)
@@ -69,6 +72,7 @@ export default function SeatModal({
     allDates,
     allBookings,
     anchorPosition,
+    onSuccess,
   };
 
   if (isMobile) {

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { IconButton, Typography, Avatar } from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faPlus } from "@fortawesome/free-solid-svg-icons";
 
 const userAvatar = {
   1234: 'https://i.pravatar.cc/150?img=1',
@@ -112,8 +113,9 @@ function SeatButton({
         </Avatar>
       ) : isHovered ? (
         // Show plus icon on hover when seat is not booked
-        <AddIcon
-          sx={{
+        <FontAwesomeIcon
+          icon={faPlus}
+          style={{
             position: "relative",
             zIndex: 1,
             color: "#fff",

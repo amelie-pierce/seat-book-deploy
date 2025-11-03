@@ -1,5 +1,6 @@
 import { Box, IconButton, Tooltip, Typography, Button } from "@mui/material";
-import { ZoomIn, ZoomOut, CenterFocusStrong, FormatListBulleted } from "@mui/icons-material";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faPlus, faMinus, faLocationCrosshairs } from "@fortawesome/free-solid-svg-icons";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { useMemo, useRef, useEffect, useState } from "react";
 import Image from "next/image";
@@ -205,7 +206,14 @@ export default function SeatingLayout({
                 {!drawerOpen && (
                   <Button
                     variant="contained"
-                    startIcon={<FormatListBulleted />}
+                    startIcon={
+                      <Image 
+                        src="/menu-open.png" 
+                        alt="Menu" 
+                        width={20}
+                        height={20}
+                      />
+                    }
                     onClick={onToggleDrawer}
                     sx={{
                       textTransform: "none",
@@ -244,12 +252,13 @@ export default function SeatingLayout({
                       width: 48,
                       height: 48,
                       color: "#000",
+                      fontSize: "1rem",
                       "&:hover": {
                         backgroundColor: "rgba(0, 0, 0, 0.04)",
                       },
                     }}
                   >
-                    <ZoomIn />
+                    <FontAwesomeIcon icon={faPlus} />
                   </IconButton>
                 </Tooltip>
 
@@ -270,12 +279,13 @@ export default function SeatingLayout({
                       width: 48,
                       height: 48,
                       color: "#000",
+                      fontSize: "1rem",
                       "&:hover": {
                         backgroundColor: "rgba(0, 0, 0, 0.04)",
                       },
                     }}
                   >
-                    <ZoomOut />
+                    <FontAwesomeIcon icon={faMinus} />
                   </IconButton>
                 </Tooltip>
               </Box>
@@ -314,9 +324,10 @@ export default function SeatingLayout({
                         "&:disabled": {
                           backgroundColor: "#fff",
                         },
+                        fontSize: "1rem",
                       }}
                     >
-                      <CenterFocusStrong />
+                      <FontAwesomeIcon icon={faLocationCrosshairs} />
                     </IconButton>
                   </span>
                 </Tooltip>
