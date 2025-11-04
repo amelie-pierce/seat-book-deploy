@@ -1154,7 +1154,14 @@ export default function Home() {
             bottom: { xs: 0, md: "auto" },
             left: { xs: 0, md: "auto" },
             right: { xs: 0, md: "auto" },
-            height: { xs: "calc(100vh - 64px)", md: "auto" }, // Full height minus navbar
+            height: { 
+              xs: "calc(100dvh - 64px)", // Use dvh for dynamic viewport on mobile Safari
+              md: "auto" 
+            },
+            maxHeight: { 
+              xs: "calc(100dvh - 64px)", // Ensure it doesn't exceed viewport
+              md: "none" 
+            },
             zIndex: { xs: 1300, md: "auto" },
             transform: {
               xs: drawerOpen ? "translateY(0)" : "translateY(100%)",
@@ -1315,6 +1322,10 @@ export default function Home() {
                   sx={{
                     backgroundColor: "#fff",
                     borderTop: "1px solid #E5E7EB",
+                    flexShrink: 0, // Prevent footer from shrinking
+                    position: { xs: "sticky", md: "relative" }, // Stick to bottom on mobile
+                    bottom: { xs: 0, md: "auto" },
+                    zIndex: 10,
                   }}
                 >
                   {/* Add Seat Dropdown */}
@@ -1370,6 +1381,10 @@ export default function Home() {
                       justifyContent: "space-between",
                       alignItems: "center",
                       p: 2,
+                      paddingBottom: { 
+                        xs: "calc(0.5rem + env(safe-area-inset-bottom))", // Add safe area padding for iPhone
+                        md: 2 
+                      },
                     }}
                   >
                     {/* Close Button - Left */}
