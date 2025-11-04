@@ -1223,7 +1223,7 @@ export default function Home() {
                       fontSize: { xs: "0.875rem", md: "1rem" },
                     }}
                   >
-                    My Booked List
+                    Booked Seats
                   </Typography>
                 </Box>
 

@@ -225,7 +225,7 @@ export default function SeatingLayout({
                       },
                     }}
                   >
-                    My booked list
+                    Booked Seats
                   </Button>
                 )}
               </Box>
