@@ -219,6 +219,7 @@ export default function SeatingLayout({
                       textTransform: "none",
                       fontWeight: 600,
                       px: 2,
+                      py: 0.5,
                       backgroundColor: "#FF6B35",
                       "&:hover": {
                         backgroundColor: "#E55A2B",
