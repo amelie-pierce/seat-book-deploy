@@ -20,17 +20,17 @@ import { processSeatBookingModifications } from "../utils/bookingModifications";
 import { SEATING_CONFIG } from "@/config/seatingConfig";
 
 const userAvatar = {
-  1234: "https://i.ibb.co/MkT31s77/408-Minh-Nguyen.jpg",
-  U001: "https://i.ibb.co/8nhwmzLC/428-Dung-Huynh.jpg",
-  U002: "https://i.ibb.co/My7pW5vQ/418-Huy-Vu.jpg",
-  U003: "https://i.ibb.co/SXXwNf97/434-Mai-Tien.jpg",
-  U004: "https://i.ibb.co/tT88X1D4/435-Nghia-Nguyen.jpg",
-  U005: "https://i.ibb.co/9mR4Zq7N/416-Thao-Nguyen.jpg",
-  U006: "https://i.ibb.co/JWckxF8d/422-Hoai-Nguyen.jpg",
-  U007: "https://i.ibb.co/mr3hw0n3/436-Tien-Nguyen.jpg",
-  U008: "https://i.ibb.co/zWV11c6Z/415-Quoc-Nguyen.jpg",
-  U009: "https://i.ibb.co/QFDHr77c/445-Thien-Truong.jpg",
-  U010: "https://i.ibb.co/5ZNdVv8/444-Khanh-Dao.jpg",
+  1234: "/assets/408 - Minh Nguyen.jpg",
+  U001: "/assets/428 - Dung Huynh.jpg",
+  U002: "/assets/418 - Huy Vu.jpg",
+  U003: "/assets/434 - Mai Tien.jpg",
+  U004: "/assets/435 - Nghia Nguyen.jpg",
+  U005: "/assets/416 - Thao Nguyen.jpg",
+  U006: "/assets/422 - Hoai Nguyen.jpg",
+  U007: "/assets/436 - Tien Nguyen.jpg",
+  U008: "/assets/415 - Quoc Nguyen.jpg",
+  U009: "/assets/445 - Thien Truong.jpeg",
+  U010: "/assets/444 - Khanh Dao.jpeg",
 } as { [key: string]: string };
 
 const SlideTransition = forwardRef<
