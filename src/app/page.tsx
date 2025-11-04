@@ -189,6 +189,8 @@ export default function Home() {
     [date: string]: string;
   }>({});
   const [bookingError, setBookingError] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastSeverity, setToastSeverity] = useState<"success" | "error">("success");
   const [userBookings, setUserBookings] = useState<BookingRecord[]>([]);
   const [userEmail, setUserEmail] = useState<string>("");
   const [isLoadingBookings, setIsLoadingBookings] = useState(true);
@@ -683,6 +685,10 @@ export default function Home() {
       if (selectedSeat === seatId) {
         setSelectedSeat(null);
       }
+
+      // Show success toast
+      setToastMessage("Booking deleted successfully");
+      setToastSeverity("success");
     } catch (error) {
       console.error("Error deleting seat bookings:", error);
       setBookingError("Failed to delete bookings");
@@ -845,6 +851,9 @@ export default function Home() {
         setAvailableSeatsForDate(seats);
       }
 
+      // Show success toast
+      setToastMessage("Bookings updated successfully");
+      setToastSeverity("success");
       setIsLoadingBookings(false);
     } catch (error) {
       console.error("Error updating bookings:", error);
@@ -892,6 +901,11 @@ export default function Home() {
 
   // Handle successful booking updates - refresh data
   const handleModalSuccess = useCallback(async () => {
+    // Clear any pending date modifications and temp seats since we just saved
+    // This ensures unsaved items (like M3 with no bookings) are removed
+    setDateModifications({});
+    setTempSeats([]);
+
     // Reload user bookings
     if (currentUser) {
       const userData = await bookingService.loadUserData(currentUser);
@@ -902,6 +916,10 @@ export default function Home() {
     if (selectedDate) {
       await handleDateClick(selectedDate);
     }
+
+    // Show success toast
+    setToastMessage("Booking saved successfully");
+    setToastSeverity("success");
   }, [currentUser, selectedDate, handleDateClick]);
 
   // Show loading state while checking authentication or loading bookings
@@ -1555,6 +1573,18 @@ export default function Home() {
       >
         <Alert severity="error" onClose={() => setBookingError(null)}>
           {bookingError}
+        </Alert>
+      </Snackbar>
+
+      {/* Toast Notification Snackbar */}
+      <Snackbar
+        open={!!toastMessage}
+        autoHideDuration={3000}
+        onClose={() => setToastMessage(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+      >
+        <Alert severity={toastSeverity} onClose={() => setToastMessage(null)}>
+          {toastMessage}
         </Alert>
       </Snackbar>
     </Container>

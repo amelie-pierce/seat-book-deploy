@@ -116,13 +116,13 @@ export default function DesktopSeatModal({
       setModifiedDates({});
       setIsUpdating(false);
 
-      // Call success callback to refresh data
+      // Close modal first
+      onClose();
+
+      // Call success callback to refresh data (after closing to avoid state issues)
       if (onSuccess) {
         onSuccess();
       }
-
-      // Close modal
-      onClose();
     } catch (error) {
       console.error("Error updating bookings:", error);
       setIsUpdating(false);
