@@ -80,7 +80,7 @@ export default function AuthPage() {
     <Container
       maxWidth={false}
       sx={{
-        minHeight: "100vh",
+        height: "100dvh",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

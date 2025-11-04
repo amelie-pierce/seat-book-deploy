@@ -398,7 +398,7 @@ export default function Home() {
       try {
         // Determine which seats to load bookings for
         let seatsToLoad: string[];
-        
+
         if (showAddSeatDropdown) {
           // When dropdown is open, load all seats
           seatsToLoad = generateAllSeats(SEATING_CONFIG);
@@ -692,7 +692,7 @@ export default function Home() {
 
       // If the seat has bookings for ALL available dates, exclude it
       const isFullyBooked = allAvailableDates.length > 0 &&
-        allAvailableDates.every(date => 
+        allAvailableDates.every(date =>
           seatBookedDates.some(booking => booking.date === date)
         );
 
@@ -874,7 +874,7 @@ export default function Home() {
       <Container
         maxWidth="xl"
         sx={{
-          height: "100vh",
+          height: "100dvh",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -894,7 +894,7 @@ export default function Home() {
     <Container
       maxWidth={false}
       disableGutters
-      sx={{ height: "100vh", display: "flex", flexDirection: "column" }}
+      sx={{ height: "100dvh", display: "flex", flexDirection: "column" }}
     >
       {/* User Session Header */}
       <Box
@@ -908,11 +908,11 @@ export default function Home() {
           borderBottom: "1px solid #CDCFD0",
         }}
       >
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           {/* Logo */}
-          <Image 
-            src="/logo.png" 
-            alt="Flexi Seat Logo" 
+          <Image
+            src="/logo.png"
+            alt="Flexi Seat Logo"
             width={25}
             height={25}
           />
@@ -921,7 +921,7 @@ export default function Home() {
           </Typography>
         </Box>
 
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <Box
             sx={{ display: "flex", alignItems: "center", gap: 1, fontWeight: 500 }}
           >
@@ -943,7 +943,8 @@ export default function Home() {
           </Box>
           <IconButton
             onClick={handleLogout}
-            sx={{ fontSize: '1.2rem' }}
+            sx={{ fontSize: '1rem' }}
+            size="small"
           >
             <FontAwesomeIcon icon={faRightFromBracket} />
           </IconButton>
@@ -956,7 +957,7 @@ export default function Home() {
           display: "flex",
           alignItems: "center",
           justifyContent: "flex-start",
-          px: 3,
+          px: 2,
           py: 1.5,
           gap: 1.5,
           overflowX: "auto",
@@ -968,7 +969,7 @@ export default function Home() {
       >
         <Typography
           fontWeight={600}
-          fontSize="0.95rem"
+          fontSize="0.875rem"
           sx={{
             minWidth: "fit-content",
             pr: 0.5,
@@ -1154,13 +1155,13 @@ export default function Home() {
             bottom: { xs: 0, md: "auto" },
             left: { xs: 0, md: "auto" },
             right: { xs: 0, md: "auto" },
-            height: { 
+            height: {
               xs: "calc(100dvh - 64px)", // Use dvh for dynamic viewport on mobile Safari
-              md: "auto" 
+              md: "auto"
             },
-            maxHeight: { 
+            maxHeight: {
               xs: "calc(100dvh - 64px)", // Ensure it doesn't exceed viewport
-              md: "none" 
+              md: "none"
             },
             zIndex: { xs: 1300, md: "auto" },
             transform: {
@@ -1200,15 +1201,17 @@ export default function Home() {
                     sx={{
                       position: "absolute",
                       left: 8,
+                      px: 1,
+                      py: 0.5,
                       color: "#fff",
                       "&:hover": {
                         backgroundColor: "rgba(255,255,255,0.1)",
                       },
                     }}
                   >
-                    <Image 
-                      src="/menu-close.png" 
-                      alt="Menu" 
+                    <Image
+                      src="/menu-close.png"
+                      alt="Menu"
                       width={20}
                       height={20}
                     />
@@ -1217,7 +1220,7 @@ export default function Home() {
                     variant="h6"
                     sx={{
                       fontWeight: 600,
-                      fontSize: "1rem",
+                      fontSize: { xs: "0.875rem", md: "1rem" },
                     }}
                   >
                     My Booked List
@@ -1381,9 +1384,9 @@ export default function Home() {
                       justifyContent: "space-between",
                       alignItems: "center",
                       p: 2,
-                      paddingBottom: { 
+                      paddingBottom: {
                         xs: "calc(0.5rem + env(safe-area-inset-bottom))", // Add safe area padding for iPhone
-                        md: 2 
+                        md: 2
                       },
                     }}
                   >

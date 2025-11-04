@@ -11,7 +11,7 @@ export default function Custom404() {
   };
 
   return (
-    <Container maxWidth="md" sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <Container maxWidth="md" sx={{ height: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <Box sx={{ textAlign: 'center', py: 4 }}>
         <ErrorIcon sx={{ fontSize: 80, color: 'error.main', mb: 2 }} />
         
