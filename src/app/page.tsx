@@ -190,7 +190,9 @@ export default function Home() {
   }>({});
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [toastSeverity, setToastSeverity] = useState<"success" | "error">("success");
+  const [toastSeverity, setToastSeverity] = useState<"success" | "error">(
+    "success"
+  );
   const [userBookings, setUserBookings] = useState<BookingRecord[]>([]);
   const [userEmail, setUserEmail] = useState<string>("");
   const [isLoadingBookings, setIsLoadingBookings] = useState(true);
@@ -1570,6 +1572,7 @@ export default function Home() {
         open={!!bookingError}
         autoHideDuration={6000}
         onClose={() => setBookingError(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
       >
         <Alert severity="error" onClose={() => setBookingError(null)}>
           {bookingError}
@@ -1581,9 +1584,19 @@ export default function Home() {
         open={!!toastMessage}
         autoHideDuration={3000}
         onClose={() => setToastMessage(null)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
       >
-        <Alert severity={toastSeverity} onClose={() => setToastMessage(null)}>
+        <Alert
+          severity={toastSeverity}
+          onClose={() => setToastMessage(null)}
+          sx={{
+            ...(toastSeverity && {
+              backgroundColor: `${toastSeverity}.main`,
+              color: "white.main",
+              "& .MuiAlert-icon": { color: "white.main" },
+            }),
+          }}
+        >
           {toastMessage}
         </Alert>
       </Snackbar>
