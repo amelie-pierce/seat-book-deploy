@@ -3,12 +3,12 @@ import { createTheme } from "@mui/material/styles";
 
 declare module "@mui/material/styles" {
   interface Palette {
-    gray: Palette['primary'];
-    white: Palette['primary'];
+    gray: Palette["primary"];
+    white: Palette["primary"];
   }
   interface PaletteOptions {
-    gray?: PaletteOptions['primary'];
-    white?: PaletteOptions['primary'];
+    gray?: PaletteOptions["primary"];
+    white?: PaletteOptions["primary"];
   }
 }
 
