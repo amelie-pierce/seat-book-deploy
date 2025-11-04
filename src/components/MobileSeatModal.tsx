@@ -14,22 +14,23 @@ import {
 } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCalendarDays } from "@fortawesome/free-solid-svg-icons";
-import { TransitionProps } from '@mui/material/transitions';
-import { format } from 'date-fns';
-import { processSeatBookingModifications } from '../utils/bookingModifications';
+import { TransitionProps } from "@mui/material/transitions";
+import { format } from "date-fns";
+import { processSeatBookingModifications } from "../utils/bookingModifications";
+import { SEATING_CONFIG } from "@/config/seatingConfig";
 
 const userAvatar = {
- 1234: 'https://i.ibb.co/MkT31s77/408-Minh-Nguyen.jpg',
-  "U001": 'https://i.ibb.co/8nhwmzLC/428-Dung-Huynh.jpg',
-  "U002": 'https://i.ibb.co/My7pW5vQ/418-Huy-Vu.jpg',
-  "U003": 'https://i.ibb.co/SXXwNf97/434-Mai-Tien.jpg',
-  "U004": 'https://i.ibb.co/tT88X1D4/435-Nghia-Nguyen.jpg',
-  "U005": 'https://i.ibb.co/9mR4Zq7N/416-Thao-Nguyen.jpg',
-  "U006": 'https://i.ibb.co/JWckxF8d/422-Hoai-Nguyen.jpg',
-  "U007": 'https://i.ibb.co/mr3hw0n3/436-Tien-Nguyen.jpg',
-  "U008": 'https://i.ibb.co/zWV11c6Z/415-Quoc-Nguyen.jpg',
-  "U009": 'https://i.ibb.co/QFDHr77c/445-Thien-Truong.jpg',
-  "U010": 'https://i.ibb.co/5ZNdVv8/444-Khanh-Dao.jpg',
+  1234: "https://i.ibb.co/MkT31s77/408-Minh-Nguyen.jpg",
+  U001: "https://i.ibb.co/8nhwmzLC/428-Dung-Huynh.jpg",
+  U002: "https://i.ibb.co/My7pW5vQ/418-Huy-Vu.jpg",
+  U003: "https://i.ibb.co/SXXwNf97/434-Mai-Tien.jpg",
+  U004: "https://i.ibb.co/tT88X1D4/435-Nghia-Nguyen.jpg",
+  U005: "https://i.ibb.co/9mR4Zq7N/416-Thao-Nguyen.jpg",
+  U006: "https://i.ibb.co/JWckxF8d/422-Hoai-Nguyen.jpg",
+  U007: "https://i.ibb.co/mr3hw0n3/436-Tien-Nguyen.jpg",
+  U008: "https://i.ibb.co/zWV11c6Z/415-Quoc-Nguyen.jpg",
+  U009: "https://i.ibb.co/QFDHr77c/445-Thien-Truong.jpg",
+  U010: "https://i.ibb.co/5ZNdVv8/444-Khanh-Dao.jpg",
 } as { [key: string]: string };
 
 const SlideTransition = forwardRef<
@@ -47,10 +48,12 @@ interface MobileSeatModalProps {
   seatId: string;
   selectedDate: string;
   currentUser?: string;
-  currentUserBooking?: {
-    seatId: string;
-    userId: string;
-  } | undefined;
+  currentUserBooking?:
+    | {
+        seatId: string;
+        userId: string;
+      }
+    | undefined;
   seatBookings: Array<{
     seatId: string;
     userId: string;
@@ -77,14 +80,16 @@ export default function MobileSeatModal({
   disabledDates = [],
   onSuccess,
 }: MobileSeatModalProps) {
-  const [modifiedDates, setModifiedDates] = useState<{ [dateStr: string]: boolean }>({});
+  const [modifiedDates, setModifiedDates] = useState<{
+    [dateStr: string]: boolean;
+  }>({});
   const [isUpdating, setIsUpdating] = useState(false);
 
   // Helper function to format date
   const formatLocalDate = (date: Date): string => {
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
   };
 
@@ -92,19 +97,23 @@ export default function MobileSeatModal({
   const getMonthYear = () => {
     if (allDates.length > 0) {
       const firstDate = allDates[0];
-      const monthName = firstDate.toLocaleDateString('en-US', { month: 'long' });
+      const monthName = firstDate.toLocaleDateString("en-US", {
+        month: "long",
+      });
       const year = firstDate.getFullYear();
       return `${monthName}, ${year}`;
     }
-    return '';
+    return "";
   };
 
   // Get user's bookings for this seat across all dates
   const getUserBookingsForSeat = () => {
     if (!currentUser || !allBookings) return [];
-    return allBookings.filter(
-      booking => booking.seatId === seatId && booking.userId === currentUser
-    ).map(booking => booking.date);
+    return allBookings
+      .filter(
+        (booking) => booking.seatId === seatId && booking.userId === currentUser
+      )
+      .map((booking) => booking.date);
   };
 
   const userBookedDates = getUserBookingsForSeat();
@@ -117,10 +126,10 @@ export default function MobileSeatModal({
   }, [open]);
 
   const handleDateToggle = (dateStr: string, isCurrentlyBooked: boolean) => {
-    setModifiedDates(prev => {
+    setModifiedDates((prev) => {
       const newMods = { ...prev };
       const isModified = newMods[dateStr] !== undefined;
-      
+
       if (isModified) {
         // If already modified, remove the modification (deselect/revert to original state)
         delete newMods[dateStr];
@@ -128,7 +137,7 @@ export default function MobileSeatModal({
         // Toggle the booking state
         newMods[dateStr] = !isCurrentlyBooked;
       }
-      
+
       return newMods;
     });
   };
@@ -167,16 +176,35 @@ export default function MobileSeatModal({
   };
 
   const formatDate = (dateStr: string) => {
-    if (!dateStr) return '';
-    const [year, month, day] = dateStr.split('-').map(Number);
+    if (!dateStr) return "";
+    const [year, month, day] = dateStr.split("-").map(Number);
     const localDate = new Date(year, month - 1, day);
-    return format(localDate, 'EEEE, MMMM d, yyyy');
+    return format(localDate, "EEEE, MMMM d, yyyy");
   };
 
   const getSeatDisplayName = (seatId: string) => {
     const tableLetter = seatId.charAt(0);
-    const seatNumber = seatId.slice(1);
-    return `Desk ${tableLetter}, Table ${seatNumber}`;
+    const zoneName = SEATING_CONFIG.zones.zone1.tables.includes(tableLetter)
+      ? "Zone A"
+      : "Zone B";
+
+    return (
+      <>
+        <Typography
+          component="span"
+          sx={{ color: "primary.main", fontWeight: 600, fontSize: "1rem" }}
+        >
+          Desk {seatId}
+        </Typography>
+        <Typography
+          component="span"
+          sx={{ color: "gray.dark", fontWeight: 400, fontSize: "0.875rem" }}
+        >
+          {" "}
+          - {zoneName}
+        </Typography>
+      </>
+    );
   };
 
   return (
@@ -188,48 +216,55 @@ export default function MobileSeatModal({
       TransitionComponent={SlideTransition}
       PaperProps={{
         sx: {
-          position: 'fixed',
+          position: "fixed",
           bottom: 0,
           left: 0,
           right: 0,
           m: 0,
-          width: '100%',
-          maxWidth: 'none',
-          borderRadius: '16px 16px 0 0',
-          maxHeight: '85vh',
-          boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.1)',
-        }
+          width: "100%",
+          maxWidth: "none",
+          borderRadius: "16px 16px 0 0",
+          maxHeight: "85vh",
+          boxShadow: "0 -8px 32px rgba(0, 0, 0, 0.1)",
+        },
       }}
       sx={{
-        '& .MuiDialog-container': {
-          alignItems: 'flex-end',
+        "& .MuiDialog-container": {
+          alignItems: "flex-end",
         },
-        '& .MuiBackdrop-root': {
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        }
+        "& .MuiBackdrop-root": {
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+        },
       }}
     >
-      <DialogTitle sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-      }}>
+      <DialogTitle
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+        }}
+      >
         <Box
           sx={{
             width: 40,
             height: 4,
-            backgroundColor: 'grey.300',
+            backgroundColor: "grey.300",
             borderRadius: 2,
             mb: 2,
-            cursor: 'pointer'
+            cursor: "pointer",
           }}
           onClick={handleClose}
         />
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="h6" component="span">
-              {getSeatDisplayName(seatId)}
-            </Typography>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            width: "100%",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Typography>{getSeatDisplayName(seatId)}</Typography>
           </Box>
         </Box>
       </DialogTitle>
@@ -237,22 +272,22 @@ export default function MobileSeatModal({
       <DialogContent sx={{ pb: 0, px: 3 }}>
         {/* Date Selection Section - Show if allDates provided */}
         {allDates.length > 0 && (
-          <Box sx={{ mb: 3, borderBottom: 1, borderColor: 'grey.300', pb: 2 }}>
+          <Box sx={{ mb: 2, borderBottom: 1, borderColor: "gray.main", pb: 2 }}>
             <Typography
               sx={{
-                fontSize: '0.875rem',
-                color: '#1F2937',
-                mb: 1,
+                fontSize: "0.875rem",
+                color: "secondary.main",
+                mb: 2,
               }}
             >
-              Select date <span style={{ fontWeight: 600 }}>({getMonthYear()}):</span>
+              Select date <span>({getMonthYear()}):</span>
             </Typography>
 
             {/* Date Chips Grid */}
             <Box
               sx={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
                 gap: 1,
               }}
             >
@@ -273,7 +308,8 @@ export default function MobileSeatModal({
                   const isPastDate = date < today;
 
                   // Disable if booked by others OR if date is in the past
-                  const isDisabled = disabledDates.includes(dateStr) || isPastDate;
+                  const isDisabled =
+                    disabledDates.includes(dateStr) || isPastDate;
 
                   // Calculate effective state after modifications
                   let isBooked = isOriginallyBooked;
@@ -281,32 +317,48 @@ export default function MobileSeatModal({
                     isBooked = modifiedDates[dateStr]; // true = will be booked, false = will be unbooked
                   }
 
-                  const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
-                  const dayNumber = String(date.getDate()).padStart(2, '0');
+                  const dayName = date.toLocaleDateString("en-US", {
+                    weekday: "short",
+                  });
+                  const dayNumber = String(date.getDate()).padStart(2, "0");
 
                   return (
                     <Chip
                       key={dateStr}
                       label={`${dayName}, ${dayNumber}`}
-                      onClick={isDisabled ? undefined : () => handleDateToggle(dateStr, isOriginallyBooked)}
+                      onClick={
+                        isDisabled
+                          ? undefined
+                          : () => handleDateToggle(dateStr, isOriginallyBooked)
+                      }
                       disabled={isDisabled}
                       sx={{
-                        borderRadius: '6px',
-                        backgroundColor: isDisabled ? '#F3F4F6' : (isBooked ? '#EAECF5' : '#ECECEE'),
-                        color: isDisabled ? '#9CA3AF' : (isBooked ? 'primary.main' : '#6B7280'),
-                        fontWeight: isModified ? 600 : 500,
-                        fontSize: '0.75rem',
-                        height: '32px',
-                        cursor: isDisabled ? 'not-allowed' : 'pointer',
+                        borderRadius: "6px",
+                        backgroundColor: isDisabled
+                          ? "#F3F4F6"
+                          : isBooked
+                          ? "primary.light"
+                          : "gray.main",
+                        color: isDisabled
+                          ? "secondary.main"
+                          : isBooked
+                          ? "primary.main"
+                          : "secondary.main",
+                        fontWeight: 700,
+                        fontSize: "0.75rem",
+                        height: "32px",
+                        cursor: isDisabled ? "not-allowed" : "pointer",
                         opacity: isDisabled ? 0.6 : 1,
-                        '& .MuiChip-label': {
+                        "& .MuiChip-label": {
                           px: 1,
                           py: 0,
                         },
-                        '&:hover': {
+                        "&:hover": {
                           backgroundColor: isDisabled
-                            ? '#F3F4F6'
-                            : (isBooked ? '#FFD4C4' : '#D1D5DB'),
+                            ? "#F3F4F6"
+                            : isBooked
+                            ? "primary.light"
+                            : "#D1D5DB",
                         },
                       }}
                     />
@@ -319,7 +371,7 @@ export default function MobileSeatModal({
         {/* Legacy single-date view - Only show if no allDates provided */}
         {allDates.length === 0 && seatBookings.length > 0 && (
           <>
-            <Box sx={{ borderTop: 1, borderColor: 'grey.300', pt: 2, mb: 3 }}>
+            <Box sx={{ borderTop: 1, borderColor: "gray.main", pt: 2, mb: 3 }}>
               <Typography variant="body2" sx={{ mb: 2, fontWeight: 600 }}>
                 Current Bookings:
               </Typography>
@@ -328,15 +380,22 @@ export default function MobileSeatModal({
                 <Box
                   key={index}
                   sx={{
-                    display: 'flex',
-                    alignItems: 'center',
+                    display: "flex",
+                    alignItems: "center",
                     gap: 2,
                     mb: 2,
                     p: 1.5,
-                    backgroundColor: booking.userId === currentUser ? 'primary.50' : 'grey.50',
+                    backgroundColor:
+                      booking.userId === currentUser ? "primary.50" : "grey.50",
                     borderRadius: 2,
-                    border: booking.userId === currentUser ? '2px solid' : '1px solid',
-                    borderColor: booking.userId === currentUser ? 'primary.main' : 'grey.200',
+                    border:
+                      booking.userId === currentUser
+                        ? "2px solid"
+                        : "1px solid",
+                    borderColor:
+                      booking.userId === currentUser
+                        ? "primary.main"
+                        : "grey.200",
                   }}
                 >
                   <Avatar
@@ -356,7 +415,7 @@ export default function MobileSeatModal({
                           label="You"
                           size="small"
                           color="primary"
-                          sx={{ ml: 1, height: 20, fontSize: '0.7rem' }}
+                          sx={{ ml: 1, height: 20, fontSize: "0.7rem" }}
                         />
                       )}
                     </Typography>
@@ -368,7 +427,17 @@ export default function MobileSeatModal({
               ))}
             </Box>
 
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, pt: 2, borderTop: 1, borderColor: 'grey.300' }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                mb: 2,
+                pt: 2,
+                borderTop: 1,
+                borderColor: "grey.300",
+              }}
+            >
               <FontAwesomeIcon icon={faCalendarDays} fontSize="small" />
               <Typography variant="body2" color="text.secondary">
                 {formatDate(selectedDate)}
@@ -379,8 +448,10 @@ export default function MobileSeatModal({
 
         {allDates.length === 0 && seatBookings.length === 0 && (
           <>
-            <Box sx={{ borderTop: 1, borderColor: 'grey.300', pt: 2, mb: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+            <Box sx={{ borderTop: 1, borderColor: "grey.300", pt: 2, mb: 3 }}>
+              <Box
+                sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}
+              >
                 <FontAwesomeIcon icon={faCalendarDays} fontSize="small" />
                 <span>Available</span>
               </Box>
@@ -390,7 +461,7 @@ export default function MobileSeatModal({
             </Box>
 
             {isSeatAvailable ? (
-              <Box sx={{ mb: 3, borderTop: 1, borderColor: 'grey.300', pt: 2 }}>
+              <Box sx={{ mb: 3, borderTop: 1, borderColor: "grey.300", pt: 2 }}>
                 <Typography variant="body2" sx={{ mb: 2 }}>
                   This desk is available for full day booking
                 </Typography>
@@ -404,15 +475,17 @@ export default function MobileSeatModal({
         )}
       </DialogContent>
 
-      <DialogActions sx={{
-        px: 3,
-        pb: 3,
-        flexDirection: 'column',
-        gap: 2,
-        '& > :not(style) ~ :not(style)': {
-          ml: 0,
-        }
-      }}>
+      <DialogActions
+        sx={{
+          px: 3,
+          pb: 3,
+          flexDirection: "column",
+          gap: 2,
+          "& > :not(style) ~ :not(style)": {
+            ml: 0,
+          },
+        }}
+      >
         {/* Show Update button if dates are provided */}
         {allDates.length > 0 && (
           <Button
@@ -422,19 +495,19 @@ export default function MobileSeatModal({
             size="large"
             disabled={Object.keys(modifiedDates).length === 0 || isUpdating}
             sx={{
-              fontSize: '1rem',
+              fontSize: "1rem",
               fontWeight: 600,
-              backgroundColor: '#FF6B35',
-              '&:hover': {
-                backgroundColor: '#E55A2B',
+              backgroundColor: "primary.main",
+              "&:hover": {
+                backgroundColor: "primary.main",
               },
-              '&:disabled': {
-                backgroundColor: '#D1D5DB',
-                color: '#9CA3AF',
+              "&:disabled": {
+                backgroundColor: "gray.dark",
+                color: "secondary.main",
               },
             }}
           >
-            {isUpdating ? 'Updating...' : 'Booking'}
+            {isUpdating ? "Updating..." : "Booking"}
           </Button>
         )}
       </DialogActions>

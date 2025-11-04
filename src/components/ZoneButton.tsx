@@ -16,16 +16,16 @@ export default function ZoneButton({ label, onClick }: ZoneButtonProps) {
         backgroundColor: "#ECECEE",
         color: "#333",
         fontWeight: 600,
-        fontSize: { xs: "0.875rem", md: "1rem" },
+        fontSize: "0.875rem",
         textTransform: "none",
         borderRadius: 1,
         px: 1,
         py: 0.5,
-        boxShadow: 'none',
+        boxShadow: "none",
         "&:hover": {
-          backgroundColor: "rgba(255, 82, 8, 0.08)",
+          backgroundColor: "rgba(91, 104, 223, 0.08)",
           color: "primary.main",
-          boxShadow: 'none',
+          boxShadow: "none",
         },
       }}
     >

@@ -1,21 +1,49 @@
-'use client';
-import { createTheme } from '@mui/material/styles';
+"use client";
+import { createTheme } from "@mui/material/styles";
 
 const theme = createTheme({
   palette: {
-    mode: 'light',
+    mode: "light",
     primary: {
-      main: '#FF5208',
+      main: "#5A67BA",
+      dark: "#4A56A0",
+      light: "#EAECF5",
     },
     secondary: {
-      main: '#dc004e',
+      main: "#4A4A4A",
+      dark: "#3A3A3A",
+      light: "#6B6B6B",
     },
     success: {
-      main: '#3CA454',
+      main: "#61BF76",
+      dark: "#4FA863",
+      light: "#7DD18F",
     },
+    error: {
+      main: "#E53E3E",
+      dark: "#C93232",
+      light: "#F06565",
+    },
+    warning: {
+      main: "#F5A623",
+      dark: "#D98E1C",
+      light: "#F8BD54",
+    },
+    info: {
+      main: "#4DA3FF",
+      dark: "#3D8FE6",
+      light: "#75B8FF",
+    },
+    gray: {
+      main: "#ECECEE",
+      dark: "#9FA4AF",
+      light: "#F7F8FA",
+    },
+    white: { main: "#FFFFFF" },
   },
   typography: {
-    fontFamily: 'var(--font-geist-sans), -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif',
+    fontFamily:
+      "var(--font-geist-sans), -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif",
   },
 });
 

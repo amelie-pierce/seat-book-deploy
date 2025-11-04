@@ -26,8 +26,8 @@ export default function BookedSeatItem({
   // Helper function to format date
   const formatLocalDate = (date: Date): string => {
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
   };
 
@@ -35,46 +35,48 @@ export default function BookedSeatItem({
   const getMonthYear = () => {
     if (allDates.length > 0) {
       const firstDate = allDates[0];
-      const monthName = firstDate.toLocaleDateString('en-US', { month: 'long' });
+      const monthName = firstDate.toLocaleDateString("en-US", {
+        month: "long",
+      });
       const year = firstDate.getFullYear();
       return `(${monthName}, ${year}):`;
     }
-    return '';
+    return "";
   };
 
   return (
     <Box
       sx={{
-        borderRadius: '8px',
+        borderRadius: "8px",
         p: 2,
         mb: 2,
-        backgroundColor: '#fff',
+        backgroundColor: "white.main",
       }}
     >
       {/* Header: Seat ID and Zone */}
       <Box
         sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
           mb: 1.5,
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <Typography
             variant="h6"
             sx={{
               fontWeight: 600,
-              fontSize: '1rem',
-              color: '#FF6B35',
+              fontSize: "1rem",
+              color: "primary.main",
             }}
           >
             Desk {seatId}
           </Typography>
           <Typography
             sx={{
-              fontSize: '0.875rem',
-              color: '#6B7280',
+              fontSize: "0.875rem",
+              color: "gray.dark",
             }}
           >
             - Zone {zone}
@@ -84,10 +86,13 @@ export default function BookedSeatItem({
           onClick={onDelete}
           size="small"
           sx={{
-            color: '#9CA3AF',
-            '&:hover': {
-              color: '#EF4444',
-              backgroundColor: '#FEE2E2',
+            color: "gray.dark",
+            border: "1px solid",
+            borderColor: "gray.main",
+            borderRadius: "4px",
+            "&:hover": {
+              color: "primary.main",
+              backgroundColor: "transparent",
             },
           }}
         >
@@ -101,19 +106,19 @@ export default function BookedSeatItem({
       {/* Date Selection Label */}
       <Typography
         sx={{
-          fontSize: '0.875rem',
-          color: '#1F2937',
+          fontSize: "0.875rem",
+          color: "secondary.main",
           mb: 1,
         }}
       >
-        Select date <span style={{ fontWeight: 600 }}>{getMonthYear()}</span>
+        Select date <span>{getMonthYear()}</span>
       </Typography>
 
       {/* Date Chips Grid */}
       <Box
         sx={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(5, 1fr)',
+          display: "grid",
+          gridTemplateColumns: "repeat(5, 1fr)",
           gap: 1,
         }}
       >
@@ -127,47 +132,63 @@ export default function BookedSeatItem({
             const dateStr = formatLocalDate(date);
             const isOriginallyBooked = bookedDates.includes(dateStr);
             const isModified = modifiedDates[dateStr] !== undefined;
-            
+
             // Check if date is in the past
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             const isPastDate = date < today;
-            
+
             // Disable if booked by others OR if date is in the past
             const isDisabled = disabledDates.includes(dateStr) || isPastDate;
-            
+
             // Calculate effective state after modifications
             let isBooked = isOriginallyBooked;
             if (isModified) {
               isBooked = modifiedDates[dateStr]; // true = will be booked, false = will be unbooked
             }
-            
-            const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
-            const dayNumber = String(date.getDate()).padStart(2, '0');
+
+            const dayName = date.toLocaleDateString("en-US", {
+              weekday: "short",
+            });
+            const dayNumber = String(date.getDate()).padStart(2, "0");
 
             return (
               <Chip
                 key={dateStr}
                 label={`${dayName}, ${dayNumber}`}
-                onClick={isDisabled ? undefined : () => onDateToggle?.(dateStr, isOriginallyBooked)}
+                onClick={
+                  isDisabled
+                    ? undefined
+                    : () => onDateToggle?.(dateStr, isOriginallyBooked)
+                }
                 disabled={isDisabled}
                 sx={{
-                  borderRadius: '6px',
-                  backgroundColor: isDisabled ? '#F3F4F6' : (isBooked ? '#EAECF5' : '#ECECEE'),
-                  color: isDisabled ? '#9CA3AF' : (isBooked ? 'primary.main' : '#6B7280'),
-                  fontWeight: 500,
-                  fontSize: '0.75rem',
-                  height: '32px',
-                  cursor: isDisabled ? 'not-allowed' : 'pointer',
+                  borderRadius: "6px",
+                  backgroundColor: isDisabled
+                    ? "#F3F4F6"
+                    : isBooked
+                    ? "primary.light"
+                    : "gray.main",
+                  color: isDisabled
+                    ? "secondary.main"
+                    : isBooked
+                    ? "primary.main"
+                    : "secondary.main",
+                  fontWeight: 700,
+                  fontSize: "0.75rem",
+                  height: "32px",
+                  cursor: isDisabled ? "not-allowed" : "pointer",
                   opacity: isDisabled ? 0.6 : 1,
-                  '& .MuiChip-label': {
+                  "& .MuiChip-label": {
                     px: 1,
                     py: 0,
                   },
-                  '&:hover': {
-                    backgroundColor: isDisabled 
-                      ? '#F3F4F6' 
-                      : (isBooked ? '#FFD4C4' : '#D1D5DB'),
+                  "&:hover": {
+                    backgroundColor: isDisabled
+                      ? "#F3F4F6"
+                      : isBooked
+                      ? "primary.light"
+                      : "#D1D5DB",
                   },
                 }}
               />

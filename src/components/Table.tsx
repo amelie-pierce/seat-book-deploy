@@ -1,12 +1,15 @@
-import { Box, Typography } from '@mui/material';
-import { useMemo, useCallback } from 'react';
-import React from 'react';
-import SeatButton from './SeatButton';
+import { Box, Typography } from "@mui/material";
+import { useMemo, useCallback } from "react";
+import React from "react";
+import SeatButton from "./SeatButton";
 
 interface TableProps {
   width?: number;
   height?: number;
-  onSeatClick?: (seatId: string, event?: React.MouseEvent<HTMLButtonElement>) => void;
+  onSeatClick?: (
+    seatId: string,
+    event?: React.MouseEvent<HTMLButtonElement>
+  ) => void;
   tableLetter: string;
   availableSeats?: string[];
   selectedSeat?: string;
@@ -35,25 +38,32 @@ function Table({
   // Determine the number of seats for this table
   // Zone A: Tables B, E, H (2nd column) have 6 seats, others have 8 seats
   // Zone B: Tables J-O (1st row) have 6 seats, Tables P-U (2nd row) have 4 seats
-  const totalSeats = seatsCount || (() => {
-    if (['B', 'E', 'H'].includes(tableLetter)) return 6;
-    if (['J', 'K', 'L', 'M', 'N', 'O'].includes(tableLetter)) return 6;
-    if (['P', 'Q', 'R', 'S', 'T', 'U'].includes(tableLetter)) return 4;
-    return 8;
-  })();
+  const totalSeats =
+    seatsCount ||
+    (() => {
+      if (["B", "E", "H"].includes(tableLetter)) return 6;
+      if (["J", "K", "L", "M", "N", "O"].includes(tableLetter)) return 6;
+      if (["P", "Q", "R", "S", "T", "U"].includes(tableLetter)) return 4;
+      return 8;
+    })();
   const seatsPerSide = totalSeats / 2; // 2, 3 or 4 seats per side
   // Debug: Log when Table C is rendered to check booking data
-  if (tableLetter === 'C') {
-    console.log(`🔍 Table C Debug: bookedSeats=`, bookedSeats, `currentUser=${currentUser}`);
+  if (tableLetter === "C") {
+    console.log(
+      `🔍 Table C Debug: bookedSeats=`,
+      bookedSeats,
+      `currentUser=${currentUser}`
+    );
   }
 
   // Define seat positions based on number of seats per side
   // These positions align with the dividing lines on the table
-  const seatPositions = seatsPerSide === 2 
-    ? ['25%', '75%'] 
-    : seatsPerSide === 3 
-    ? ['16.6667%', '50%', '83.3333%'] 
-    : ['12.5%', '37.5%', '62.5%', '87.5%'];
+  const seatPositions =
+    seatsPerSide === 2
+      ? ["25%", "75%"]
+      : seatsPerSide === 3
+      ? ["16.6667%", "50%", "83.3333%"]
+      : ["12.5%", "37.5%", "62.5%", "87.5%"];
 
   // Memoize seat availability calculations to avoid recalculating on every render
   const seatAvailabilityMap = useMemo(() => {
@@ -63,7 +73,7 @@ function Table({
       const seatId = `${tableLetter}${seatNumber}`;
 
       // Find all bookings for this seat
-      const seatBookings = bookedSeats.filter(b => b.seatId === seatId);
+      const seatBookings = bookedSeats.filter((b) => b.seatId === seatId);
 
       // If no bookings, seat is available
       if (seatBookings.length === 0) {
@@ -77,67 +87,80 @@ function Table({
     return availabilityMap;
   }, [tableLetter, bookedSeats, totalSeats]);
 
-  const handleSeatClick = useCallback((seatNumber: number, event?: React.MouseEvent<HTMLButtonElement>) => {
-    const seatId = `${tableLetter}${seatNumber}`;
-    if (onSeatClick) {
-      onSeatClick(seatId, event);
-    }
-  }, [tableLetter, onSeatClick]);
+  const handleSeatClick = useCallback(
+    (seatNumber: number, event?: React.MouseEvent<HTMLButtonElement>) => {
+      const seatId = `${tableLetter}${seatNumber}`;
+      if (onSeatClick) {
+        onSeatClick(seatId, event);
+      }
+    },
+    [tableLetter, onSeatClick]
+  );
 
-  const isSeatAvailable = useCallback((seatNumber: number) => {
-    return seatAvailabilityMap.get(seatNumber) ?? true;
-  }, [seatAvailabilityMap]);
+  const isSeatAvailable = useCallback(
+    (seatNumber: number) => {
+      return seatAvailabilityMap.get(seatNumber) ?? true;
+    },
+    [seatAvailabilityMap]
+  );
 
-  const isSeatSelected = useCallback((seatNumber: number) => {
-    const seatId = `${tableLetter}${seatNumber}`;
-    return selectedSeat === seatId;
-  }, [tableLetter, selectedSeat]);
+  const isSeatSelected = useCallback(
+    (seatNumber: number) => {
+      const seatId = `${tableLetter}${seatNumber}`;
+      return selectedSeat === seatId;
+    },
+    [tableLetter, selectedSeat]
+  );
 
-  const getBookedByUser = useCallback((seatNumber: number) => {
-    const seatId = `${tableLetter}${seatNumber}`;
-    const seatBooking = bookedSeats.find(b => b.seatId === seatId);
-    
-    // Return the user who booked this seat (for display purposes)
-    if (seatBooking) {
-      return seatBooking.userId;
-    }
-    
-    return undefined;
-  }, [tableLetter, bookedSeats]);  return (
-    <Box sx={{ position: 'relative' }}>
+  const getBookedByUser = useCallback(
+    (seatNumber: number) => {
+      const seatId = `${tableLetter}${seatNumber}`;
+      const seatBooking = bookedSeats.find((b) => b.seatId === seatId);
+
+      // Return the user who booked this seat (for display purposes)
+      if (seatBooking) {
+        return seatBooking.userId;
+      }
+
+      return undefined;
+    },
+    [tableLetter, bookedSeats]
+  );
+  return (
+    <Box sx={{ position: "relative" }}>
       <Box
         sx={{
           width: rotated ? height : width,
           height: rotated ? width : height,
-          backgroundColor: '#ECECEE',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          backgroundColor: "#ECECEE",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
           borderRadius: 1,
         }}
       >
         <Box
           sx={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
             zIndex: 2,
-            backgroundColor: '#D1D1D1',
-            width: '45px',
-            height: '45px',
+            backgroundColor: "#D1D1D1",
+            width: "45px",
+            height: "45px",
             borderRadius: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
           <Typography
             variant="h6"
             sx={{
-              fontWeight: 'bold',
-              color: '#333',
-              fontSize: '2rem',
+              fontWeight: "bold",
+              color: "secondary.main",
+              fontSize: "2rem",
             }}
           >
             {tableLetter}
@@ -152,37 +175,37 @@ function Table({
             {seatsPerSide === 2 ? (
               <Box
                 sx={{
-                  position: 'absolute',
-                  left: '50%',
+                  position: "absolute",
+                  left: "50%",
                   top: 0,
                   bottom: 0,
-                  width: '2px',
-                  backgroundColor: '#fff',
-                  zIndex: 1
+                  width: "2px",
+                  backgroundColor: "white.main",
+                  zIndex: 1,
                 }}
               />
             ) : seatsPerSide === 3 ? (
               <>
                 <Box
                   sx={{
-                    position: 'absolute',
-                    left: '33.3333%',
+                    position: "absolute",
+                    left: "33.3333%",
                     top: 0,
                     bottom: 0,
-                    width: '2px',
-                    backgroundColor: '#fff',
-                    zIndex: 1
+                    width: "2px",
+                    backgroundColor: "white.main",
+                    zIndex: 1,
                   }}
                 />
                 <Box
                   sx={{
-                    position: 'absolute',
-                    left: '66.6667%',
+                    position: "absolute",
+                    left: "66.6667%",
                     top: 0,
                     bottom: 0,
-                    width: '2px',
-                    backgroundColor: '#fff',
-                    zIndex: 1
+                    width: "2px",
+                    backgroundColor: "white.main",
+                    zIndex: 1,
                   }}
                 />
               </>
@@ -190,35 +213,35 @@ function Table({
               <>
                 <Box
                   sx={{
-                    position: 'absolute',
-                    left: '25%',
+                    position: "absolute",
+                    left: "25%",
                     top: 0,
                     bottom: 0,
-                    width: '2px',
-                    backgroundColor: '#fff',
-                    zIndex: 1
+                    width: "2px",
+                    backgroundColor: "#fff",
+                    zIndex: 1,
                   }}
                 />
                 <Box
                   sx={{
-                    position: 'absolute',
-                    left: '50%',
+                    position: "absolute",
+                    left: "50%",
                     top: 0,
                     bottom: 0,
-                    width: '2px',
-                    backgroundColor: '#fff',
-                    zIndex: 1
+                    width: "2px",
+                    backgroundColor: "white.main",
+                    zIndex: 1,
                   }}
                 />
                 <Box
                   sx={{
-                    position: 'absolute',
-                    left: '75%',
+                    position: "absolute",
+                    left: "75%",
                     top: 0,
                     bottom: 0,
-                    width: '2px',
-                    backgroundColor: '#fff',
-                    zIndex: 1
+                    width: "2px",
+                    backgroundColor: "white.main",
+                    zIndex: 1,
                   }}
                 />
               </>
@@ -226,13 +249,13 @@ function Table({
             {/* Horizontal line */}
             <Box
               sx={{
-                position: 'absolute',
-                top: '50%',
+                position: "absolute",
+                top: "50%",
                 left: 0,
                 right: 0,
-                height: '2px',
-                backgroundColor: '#fff',
-                zIndex: 1
+                height: "2px",
+                backgroundColor: "white.main",
+                zIndex: 1,
               }}
             />
           </>
@@ -243,37 +266,37 @@ function Table({
             {seatsPerSide === 2 ? (
               <Box
                 sx={{
-                  position: 'absolute',
-                  top: '50%',
+                  position: "absolute",
+                  top: "50%",
                   left: 0,
                   right: 0,
-                  height: '2px',
-                  backgroundColor: '#fff',
-                  zIndex: 1
+                  height: "2px",
+                  backgroundColor: "white.main",
+                  zIndex: 1,
                 }}
               />
             ) : seatsPerSide === 3 ? (
               <>
                 <Box
                   sx={{
-                    position: 'absolute',
-                    top: '33.3333%',
+                    position: "absolute",
+                    top: "33.3333%",
                     left: 0,
                     right: 0,
-                    height: '2px',
-                    backgroundColor: '#fff',
-                    zIndex: 1
+                    height: "2px",
+                    backgroundColor: "white.main",
+                    zIndex: 1,
                   }}
                 />
                 <Box
                   sx={{
-                    position: 'absolute',
-                    top: '66.6667%',
+                    position: "absolute",
+                    top: "66.6667%",
                     left: 0,
                     right: 0,
-                    height: '2px',
-                    backgroundColor: '#fff',
-                    zIndex: 1
+                    height: "2px",
+                    backgroundColor: "white.main",
+                    zIndex: 1,
                   }}
                 />
               </>
@@ -281,35 +304,35 @@ function Table({
               <>
                 <Box
                   sx={{
-                    position: 'absolute',
-                    top: '25%',
+                    position: "absolute",
+                    top: "25%",
                     left: 0,
                     right: 0,
-                    height: '2px',
-                    backgroundColor: '#fff',
-                    zIndex: 1
+                    height: "2px",
+                    backgroundColor: "#fff",
+                    zIndex: 1,
                   }}
                 />
                 <Box
                   sx={{
-                    position: 'absolute',
-                    top: '50%',
+                    position: "absolute",
+                    top: "50%",
                     left: 0,
                     right: 0,
-                    height: '2px',
-                    backgroundColor: '#fff',
-                    zIndex: 1
+                    height: "2px",
+                    backgroundColor: "white.main",
+                    zIndex: 1,
                   }}
                 />
                 <Box
                   sx={{
-                    position: 'absolute',
-                    top: '75%',
+                    position: "absolute",
+                    top: "75%",
                     left: 0,
                     right: 0,
-                    height: '2px',
-                    backgroundColor: '#fff',
-                    zIndex: 1
+                    height: "2px",
+                    backgroundColor: "#fff",
+                    zIndex: 1,
                   }}
                 />
               </>
@@ -317,13 +340,13 @@ function Table({
             {/* Vertical line */}
             <Box
               sx={{
-                position: 'absolute',
-                left: '50%',
+                position: "absolute",
+                left: "50%",
                 top: 0,
                 bottom: 0,
-                width: '2px',
-                backgroundColor: '#fff',
-                zIndex: 1
+                width: "2px",
+                backgroundColor: "white.main",
+                zIndex: 1,
               }}
             />
           </>

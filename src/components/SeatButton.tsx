@@ -4,17 +4,17 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus } from "@fortawesome/free-solid-svg-icons";
 
 const userAvatar = {
-  1234: 'https://i.ibb.co/MkT31s77/408-Minh-Nguyen.jpg',
-  "U001": 'https://i.ibb.co/8nhwmzLC/428-Dung-Huynh.jpg',
-  "U002": 'https://i.ibb.co/My7pW5vQ/418-Huy-Vu.jpg',
-  "U003": 'https://i.ibb.co/SXXwNf97/434-Mai-Tien.jpg',
-  "U004": 'https://i.ibb.co/tT88X1D4/435-Nghia-Nguyen.jpg',
-  "U005": 'https://i.ibb.co/9mR4Zq7N/416-Thao-Nguyen.jpg',
-  "U006": 'https://i.ibb.co/JWckxF8d/422-Hoai-Nguyen.jpg',
-  "U007": 'https://i.ibb.co/mr3hw0n3/436-Tien-Nguyen.jpg',
-  "U008": 'https://i.ibb.co/zWV11c6Z/415-Quoc-Nguyen.jpg',
-  "U009": 'https://i.ibb.co/QFDHr77c/445-Thien-Truong.jpg',
-  "U010": 'https://i.ibb.co/5ZNdVv8/444-Khanh-Dao.jpg',
+  1234: "https://i.ibb.co/MkT31s77/408-Minh-Nguyen.jpg",
+  U001: "https://i.ibb.co/8nhwmzLC/428-Dung-Huynh.jpg",
+  U002: "https://i.ibb.co/My7pW5vQ/418-Huy-Vu.jpg",
+  U003: "https://i.ibb.co/SXXwNf97/434-Mai-Tien.jpg",
+  U004: "https://i.ibb.co/tT88X1D4/435-Nghia-Nguyen.jpg",
+  U005: "https://i.ibb.co/9mR4Zq7N/416-Thao-Nguyen.jpg",
+  U006: "https://i.ibb.co/JWckxF8d/422-Hoai-Nguyen.jpg",
+  U007: "https://i.ibb.co/mr3hw0n3/436-Tien-Nguyen.jpg",
+  U008: "https://i.ibb.co/zWV11c6Z/415-Quoc-Nguyen.jpg",
+  U009: "https://i.ibb.co/QFDHr77c/445-Thien-Truong.jpg",
+  U010: "https://i.ibb.co/5ZNdVv8/444-Khanh-Dao.jpg",
 } as { [key: string]: string };
 
 interface SeatButtonProps {
@@ -75,41 +75,46 @@ function SeatButton({
         position: "absolute",
         ...(position === "top" || position === "bottom"
           ? {
-            [position]: -25,
-            left: leftPosition,
-            transform: "translateX(-50%)",
-          }
+              [position]: -25,
+              left: leftPosition,
+              transform: "translateX(-50%)",
+            }
           : {
-            [position]: -25,
-            top: leftPosition,
-            transform: "translateY(-50%)",
-          }
-        ),
+              [position]: -25,
+              top: leftPosition,
+              transform: "translateY(-50%)",
+            }),
         width: 50,
         height: 50,
         padding: 0,
         overflow: "hidden",
         // border: `2px solid #CDCFD0`,
-        backgroundColor: isDisabled ? '#D1D5DB' : (isBooked ? (isBookedByCurrentUser ? '#F5A623' : '#CDCFD0') : '#61BF76'),
+        backgroundColor: isDisabled
+          ? "#D1D5DB"
+          : isBooked
+          ? isBookedByCurrentUser
+            ? "#F5A623"
+            : "#CDCFD0"
+          : "#61BF76",
         opacity: isDisabled ? 0.5 : 1,
-        cursor: isDisabled ? 'not-allowed' : 'pointer',
+        cursor: isDisabled ? "not-allowed" : "pointer",
         ...(isBookedByCurrentUser && {
           boxShadow: `
                 0 0 10px 8px rgba(245, 166, 35, 0.6),
                 0 0 40px 15px rgba(245, 166, 35, 0.4),
                 0 0 60px 20px rgba(245, 166, 35, 0.2)
               `,
-          border: '2px solid rgba(245, 166, 35, 0.8)',
+          border: "2px solid rgba(245, 166, 35, 0.8)",
         }),
         "&:hover": {
-          backgroundColor: isDisabled ? '#D1D5DB' : '#FF5208',
+          backgroundColor: isDisabled ? "gray.dark" : "primary.main",
         },
         "&.Mui-disabled": {
-          backgroundColor: '#D1D5DB',
+          backgroundColor: "gray.dark",
           opacity: 0.5,
         },
       }}
-    // disabled={!isAvailable && !timeSlots.isCurrentUser}
+      // disabled={!isAvailable && !timeSlots.isCurrentUser}
     >
       {isBooked && bookedByUser ? (
         // Show full avatar for full-day booking
@@ -118,7 +123,7 @@ function SeatButton({
           sx={{
             width: 41,
             height: 41,
-            fontSize: '0.75rem',
+            fontSize: "0.75rem",
             position: "relative",
             zIndex: 1,
           }}
@@ -143,7 +148,7 @@ function SeatButton({
           sx={{
             position: "relative",
             zIndex: 1,
-            color: "#fff",
+            color: "white.main",
             fontSize: "1.5rem",
             fontWeight: "bold",
           }}

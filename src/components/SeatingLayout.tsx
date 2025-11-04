@@ -1,6 +1,10 @@
 import { Box, IconButton, Tooltip, Typography, Button } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faMinus, faLocationCrosshairs } from "@fortawesome/free-solid-svg-icons";
+import {
+  faPlus,
+  faMinus,
+  faLocationCrosshairs,
+} from "@fortawesome/free-solid-svg-icons";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { useMemo, useRef, useEffect, useState } from "react";
 import Image from "next/image";
@@ -68,7 +72,14 @@ export default function SeatingLayout({
   }, [seatingConfig.zones]);
 
   // Handle zone focus (zoom/center only, no highlighting)
-  const handleZoneFocus = (zone: "zone1" | "zone2" | "fullmap", zoomToElement: (element: HTMLElement, scale: number, duration: number) => void) => {
+  const handleZoneFocus = (
+    zone: "zone1" | "zone2" | "fullmap",
+    zoomToElement: (
+      element: HTMLElement,
+      scale: number,
+      duration: number
+    ) => void
+  ) => {
     const seatElement = document.getElementById(`seating-${zone}`);
     if (seatElement) {
       // Different scales for different views
@@ -101,7 +112,7 @@ export default function SeatingLayout({
     if (selectedDate && currentUser) {
       // Find the seat booked by current user for the selected date
       const userBookingForDate = bookedSeats.find(
-        booking => booking.userId === currentUser
+        (booking) => booking.userId === currentUser
       );
       if (userBookingForDate) {
         return userBookingForDate.seatId;
@@ -114,7 +125,13 @@ export default function SeatingLayout({
     }
 
     return selectedSeat || null;
-  }, [selectedDate, currentUser, bookedSeats, selectedSeatsFromDropdown, selectedSeat]);
+  }, [
+    selectedDate,
+    currentUser,
+    bookedSeats,
+    selectedSeatsFromDropdown,
+    selectedSeat,
+  ]);
 
   return (
     <Box
@@ -187,11 +204,21 @@ export default function SeatingLayout({
                     alignItems: "center",
                   }}
                 >
-                  <Typography fontWeight={600} sx={{ display: { xs: "none", md: "inline-block" } }}>Location: </Typography>
+                  <Typography
+                    fontWeight={600}
+                    sx={{
+                      display: { xs: "none", md: "inline-block" },
+                      fontSize: "0.8rem",
+                    }}
+                  >
+                    Location:{" "}
+                  </Typography>
+
                   <ZoneButton
                     label="Zone A"
                     onClick={() => handleZoneFocus("zone1", zoomToElement)}
                   />
+
                   <ZoneButton
                     label="Zone B"
                     onClick={() => handleZoneFocus("zone2", zoomToElement)}
@@ -220,9 +247,9 @@ export default function SeatingLayout({
                       fontWeight: 600,
                       px: 2,
                       py: 0.5,
-                      backgroundColor: "#FF6B35",
+                      backgroundColor: "primary.main",
                       "&:hover": {
-                        backgroundColor: "#E55A2B",
+                        backgroundColor: "primary.main",
                       },
                     }}
                   >
@@ -279,7 +306,7 @@ export default function SeatingLayout({
                       borderRadius: 0,
                       width: 48,
                       height: 48,
-                      color: "#000",
+                      color: "secondary.main",
                       fontSize: "1rem",
                       "&:hover": {
                         backgroundColor: "rgba(0, 0, 0, 0.04)",
@@ -300,12 +327,21 @@ export default function SeatingLayout({
                   zIndex: 10,
                 }}
               >
-                <Tooltip title={effectiveSelectedSeat ? "Zoom to Selected Seat" : "No Seat Selected"} placement="left">
+                <Tooltip
+                  title={
+                    effectiveSelectedSeat
+                      ? "Zoom to Selected Seat"
+                      : "No Seat Selected"
+                  }
+                  placement="left"
+                >
                   <span>
                     <IconButton
                       onClick={() => {
                         if (effectiveSelectedSeat) {
-                          const seatElement = document.querySelector(`[data-seat-id="${effectiveSelectedSeat}"]`);
+                          const seatElement = document.querySelector(
+                            `[data-seat-id="${effectiveSelectedSeat}"]`
+                          );
                           if (seatElement) {
                             zoomToElement(seatElement as HTMLElement, 1, 500);
                           }
@@ -315,15 +351,17 @@ export default function SeatingLayout({
                       sx={{
                         width: 48,
                         height: 48,
-                        backgroundColor: "#fff",
+                        backgroundColor: "white.main",
                         borderRadius: "50%",
                         boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
                         color: effectiveSelectedSeat ? "#000" : "#ccc",
                         "&:hover": {
-                          backgroundColor: effectiveSelectedSeat ? "rgba(0, 0, 0, 0.04)" : "#fff",
+                          backgroundColor: effectiveSelectedSeat
+                            ? "rgba(0, 0, 0, 0.04)"
+                            : "white.main",
                         },
                         "&:disabled": {
-                          backgroundColor: "#fff",
+                          backgroundColor: "white.main",
                         },
                         fontSize: "1rem",
                       }}
@@ -352,7 +390,8 @@ export default function SeatingLayout({
                 <Box
                   id="seating-fullmap"
                   onDoubleClick={() => {
-                    const fullMapElement = document.getElementById("seating-fullmap");
+                    const fullMapElement =
+                      document.getElementById("seating-fullmap");
                     if (fullMapElement) {
                       zoomToElement(fullMapElement as HTMLElement, 0.4, 500);
                     }
@@ -360,7 +399,7 @@ export default function SeatingLayout({
                   sx={{
                     display: "flex",
                     gap: 6,
-                    border: "6px solid black"
+                    border: "6px solid black",
                   }}
                 >
                   {/* Zone 1 */}
@@ -413,7 +452,15 @@ export default function SeatingLayout({
                       ))}
                     </Box>
                   </Box>
-                  <Box id="seating-meeting" sx={{ width: 200, flexShrink: 0, display: 'flex', alignItems: 'flex-start' }}>
+                  <Box
+                    id="seating-meeting"
+                    sx={{
+                      width: 200,
+                      flexShrink: 0,
+                      display: "flex",
+                      alignItems: "flex-start",
+                    }}
+                  >
                     <Image
                       src="/meeting-room.png"
                       alt="Meeting Rooms"
@@ -423,7 +470,7 @@ export default function SeatingLayout({
                         height: "auto",
                         maxWidth: "100%",
                         maxHeight: "100%",
-                        borderBottom: '12px solid black',
+                        borderBottom: "12px solid black",
                       }}
                     />
                   </Box>

@@ -33,25 +33,25 @@ import { BookingRecord } from "../utils/bookingStorage";
 import { processMultipleSeatBookingModifications } from "../utils/bookingModifications";
 
 const userAvatar = {
-  1234: 'https://i.ibb.co/MkT31s77/408-Minh-Nguyen.jpg',
-  "U001": 'https://i.ibb.co/8nhwmzLC/428-Dung-Huynh.jpg',
-  "U002": 'https://i.ibb.co/My7pW5vQ/418-Huy-Vu.jpg',
-  "U003": 'https://i.ibb.co/SXXwNf97/434-Mai-Tien.jpg',
-  "U004": 'https://i.ibb.co/tT88X1D4/435-Nghia-Nguyen.jpg',
-  "U005": 'https://i.ibb.co/9mR4Zq7N/416-Thao-Nguyen.jpg',
-  "U006": 'https://i.ibb.co/JWckxF8d/422-Hoai-Nguyen.jpg',
-  "U007": 'https://i.ibb.co/mr3hw0n3/436-Tien-Nguyen.jpg',
-  "U008": 'https://i.ibb.co/zWV11c6Z/415-Quoc-Nguyen.jpg',
-  "U009": 'https://i.ibb.co/QFDHr77c/445-Thien-Truong.jpg',
-  "U010": 'https://i.ibb.co/5ZNdVv8/444-Khanh-Dao.jpg',
-}
+  1234: "https://i.ibb.co/MkT31s77/408-Minh-Nguyen.jpg",
+  U001: "https://i.ibb.co/8nhwmzLC/428-Dung-Huynh.jpg",
+  U002: "https://i.ibb.co/My7pW5vQ/418-Huy-Vu.jpg",
+  U003: "https://i.ibb.co/SXXwNf97/434-Mai-Tien.jpg",
+  U004: "https://i.ibb.co/tT88X1D4/435-Nghia-Nguyen.jpg",
+  U005: "https://i.ibb.co/9mR4Zq7N/416-Thao-Nguyen.jpg",
+  U006: "https://i.ibb.co/JWckxF8d/422-Hoai-Nguyen.jpg",
+  U007: "https://i.ibb.co/mr3hw0n3/436-Tien-Nguyen.jpg",
+  U008: "https://i.ibb.co/zWV11c6Z/415-Quoc-Nguyen.jpg",
+  U009: "https://i.ibb.co/QFDHr77c/445-Thien-Truong.jpg",
+  U010: "https://i.ibb.co/5ZNdVv8/444-Khanh-Dao.jpg",
+};
 
 export default function Home() {
   // Helper function to convert local date to YYYY-MM-DD string without timezone issues
   const formatLocalDate = (date: Date): string => {
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
   };
 
@@ -59,7 +59,7 @@ export default function Home() {
 
   // Check if a given date string is a weekend (Saturday = 6, Sunday = 0)
   const isDateWeekend = (dateStr: string): boolean => {
-    const date = new Date(dateStr + 'T00:00:00'); // Add time to avoid timezone issues
+    const date = new Date(dateStr + "T00:00:00"); // Add time to avoid timezone issues
     const dayOfWeek = date.getDay();
     return dayOfWeek === 0 || dayOfWeek === 6;
   };
@@ -125,11 +125,13 @@ export default function Home() {
   const monthYearLabel = useMemo(() => {
     if (dateChips.dates.length > 0) {
       const firstDate = dateChips.dates[0];
-      const monthName = firstDate.toLocaleDateString('en-US', { month: 'long' });
+      const monthName = firstDate.toLocaleDateString("en-US", {
+        month: "long",
+      });
       const year = firstDate.getFullYear();
       return `${monthName}, ${year}:`;
     }
-    return 'Dates:';
+    return "Dates:";
   }, [dateChips.dates]);
 
   // Function to get the first available (non-disabled) date
@@ -214,7 +216,10 @@ export default function Home() {
   const [mobileSeatModalSeatId, setMobileSeatModalSeatId] =
     useState<string>("");
   const [mobileSeatModalDate, setMobileSeatModalDate] = useState<string>("");
-  const [modalAnchorPosition, setModalAnchorPosition] = useState<{ top: number; left: number } | null>(null);
+  const [modalAnchorPosition, setModalAnchorPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
 
   // Track modifications for drawer update functionality
   // Format: { seatId: { dateStr: boolean } } where true = add booking, false = remove booking
@@ -264,9 +269,9 @@ export default function Home() {
       }, 150);
     };
 
-    window.addEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
     return () => {
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener("resize", handleResize);
       clearTimeout(resizeTimer);
     };
   }, []);
@@ -404,11 +409,15 @@ export default function Home() {
           seatsToLoad = generateAllSeats(SEATING_CONFIG);
         } else {
           // Otherwise, load seats that user has booked, added as temp, or currently viewing in modal
-          seatsToLoad = [...new Set([
-            ...userBookings.map(b => b.seatId),
-            ...tempSeats,
-            ...(mobileSeatModalOpen && mobileSeatModalSeatId ? [mobileSeatModalSeatId] : [])
-          ])];
+          seatsToLoad = [
+            ...new Set([
+              ...userBookings.map((b) => b.seatId),
+              ...tempSeats,
+              ...(mobileSeatModalOpen && mobileSeatModalSeatId
+                ? [mobileSeatModalSeatId]
+                : []),
+            ]),
+          ];
         }
 
         if (seatsToLoad.length === 0) {
@@ -416,13 +425,15 @@ export default function Home() {
           return;
         }
 
-        const allBookings: { [seatId: string]: Array<{ date: string; userId: string }> } = {};
+        const allBookings: {
+          [seatId: string]: Array<{ date: string; userId: string }>;
+        } = {};
 
         // Get all available dates
-        const datesToCheck = dateChips.dates.map(date => {
+        const datesToCheck = dateChips.dates.map((date) => {
           const year = date.getFullYear();
-          const month = String(date.getMonth() + 1).padStart(2, '0');
-          const day = String(date.getDate()).padStart(2, '0');
+          const month = String(date.getMonth() + 1).padStart(2, "0");
+          const day = String(date.getDate()).padStart(2, "0");
           return `${year}-${month}-${day}`;
         });
 
@@ -431,9 +442,11 @@ export default function Home() {
           const seatBookings: Array<{ date: string; userId: string }> = [];
 
           for (const dateStr of datesToCheck) {
-            const dateBookings = await bookingService.getBookingsForDate(dateStr);
+            const dateBookings = await bookingService.getBookingsForDate(
+              dateStr
+            );
             const booking = dateBookings.find(
-              b => b.seatId === seatId && b.status === 'ACTIVE'
+              (b) => b.seatId === seatId && b.status === "ACTIVE"
             );
 
             if (booking) {
@@ -451,9 +464,20 @@ export default function Home() {
     };
 
     loadAllSeatsBookings();
-  }, [showAddSeatDropdown, currentUser, dateChips.dates, userBookings, tempSeats, mobileSeatModalOpen, mobileSeatModalSeatId]);
+  }, [
+    showAddSeatDropdown,
+    currentUser,
+    dateChips.dates,
+    userBookings,
+    tempSeats,
+    mobileSeatModalOpen,
+    mobileSeatModalSeatId,
+  ]);
 
-  const handleSeatClick = (seatId: string, event?: React.MouseEvent<HTMLButtonElement>) => {
+  const handleSeatClick = (
+    seatId: string,
+    event?: React.MouseEvent<HTMLButtonElement>
+  ) => {
     // Check seat availability - simplified for FULL_DAY bookings only
     const isSeatClickable = () => {
       // Find all bookings for this seat on the selected date
@@ -483,7 +507,7 @@ export default function Home() {
     if (isSeatClickable()) {
       // Open the seat selection modal for both mobile and desktop
       if (selectedDate) {
-        console.log("selectedDate", selectedDate)
+        console.log("selectedDate", selectedDate);
         // Calculate position for desktop modal
         if (event) {
           const buttonRect = event.currentTarget.getBoundingClientRect();
@@ -638,7 +662,9 @@ export default function Home() {
 
       // Refresh all bookings for the current date if needed
       if (selectedDate) {
-        const dateBookings = await bookingService.getBookingsForDate(selectedDate);
+        const dateBookings = await bookingService.getBookingsForDate(
+          selectedDate
+        );
         const bookedSeatsData = dateBookings.map((booking) => ({
           seatId: booking.seatId,
           userId: booking.userId,
@@ -667,13 +693,13 @@ export default function Home() {
   // Also filter out seats that are fully booked by others for all dates
   const getAvailableSeatsForDropdown = () => {
     const allSeats = generateAllSeats(SEATING_CONFIG);
-    const userSeatIds = [...new Set(userBookings.map(b => b.seatId))];
+    const userSeatIds = [...new Set(userBookings.map((b) => b.seatId))];
 
     // Get all available dates (working days)
-    const allAvailableDates = dateChips.dates.map(date => {
+    const allAvailableDates = dateChips.dates.map((date) => {
       const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
       return `${year}-${month}-${day}`;
     });
 
@@ -681,7 +707,7 @@ export default function Home() {
     // 1. Already in user's bookings
     // 2. Already in temp seats
     // 3. Fully booked for ALL available dates
-    return allSeats.filter(seatId => {
+    return allSeats.filter((seatId) => {
       // Check if already in user's list
       if (userSeatIds.includes(seatId) || tempSeats.includes(seatId)) {
         return false;
@@ -691,9 +717,10 @@ export default function Home() {
       const seatBookedDates = allSeatsBookings[seatId] || [];
 
       // If the seat has bookings for ALL available dates, exclude it
-      const isFullyBooked = allAvailableDates.length > 0 &&
-        allAvailableDates.every(date =>
-          seatBookedDates.some(booking => booking.date === date)
+      const isFullyBooked =
+        allAvailableDates.length > 0 &&
+        allAvailableDates.every((date) =>
+          seatBookedDates.some((booking) => booking.date === date)
         );
 
       return !isFullyBooked;
@@ -703,16 +730,16 @@ export default function Home() {
   // Handle adding a temporary seat
   const handleAddTempSeat = (seatId: string) => {
     if (seatId && !tempSeats.includes(seatId)) {
-      setTempSeats(prev => [...prev, seatId]);
+      setTempSeats((prev) => [...prev, seatId]);
       setShowAddSeatDropdown(false);
     }
   };
 
   // Handle deleting a temporary seat
   const handleDeleteTempSeat = (seatId: string) => {
-    setTempSeats(prev => prev.filter(id => id !== seatId));
+    setTempSeats((prev) => prev.filter((id) => id !== seatId));
     // Also remove any modifications for this temp seat
-    setDateModifications(prev => {
+    setDateModifications((prev) => {
       const newMods = { ...prev };
       delete newMods[seatId];
       return newMods;
@@ -720,7 +747,11 @@ export default function Home() {
   };
 
   // Handle toggling date selection in drawer
-  const handleDateToggle = (seatId: string, dateStr: string, currentlyBooked: boolean) => {
+  const handleDateToggle = (
+    seatId: string,
+    dateStr: string,
+    currentlyBooked: boolean
+  ) => {
     setDateModifications((prev) => {
       const newMods = { ...prev };
       const seatMods = newMods[seatId] || {};
@@ -750,7 +781,7 @@ export default function Home() {
       // If this seat will be booked on this date, unbook any other seats on the same date
       if (willBeBooked) {
         // Find all other seats that are booked (or will be booked) on this date
-        userBookings.forEach(booking => {
+        userBookings.forEach((booking) => {
           if (booking.date === dateStr && booking.seatId !== seatId) {
             // Mark originally booked seats for removal
             if (!newMods[booking.seatId]) {
@@ -782,7 +813,10 @@ export default function Home() {
       setIsLoadingBookings(true);
 
       // Process all modifications (including temp seats)
-      await processMultipleSeatBookingModifications(dateModifications, currentUser);
+      await processMultipleSeatBookingModifications(
+        dateModifications,
+        currentUser
+      );
 
       // Clear modifications and temp seats
       setDateModifications({});
@@ -794,7 +828,9 @@ export default function Home() {
 
       // Refresh all bookings for the current date if needed
       if (selectedDate) {
-        const dateBookings = await bookingService.getBookingsForDate(selectedDate);
+        const dateBookings = await bookingService.getBookingsForDate(
+          selectedDate
+        );
         const bookedSeatsData = dateBookings.map((booking) => ({
           seatId: booking.seatId,
           userId: booking.userId,
@@ -910,20 +946,25 @@ export default function Home() {
       >
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           {/* Logo */}
-          <Image
-            src="/logo.png"
-            alt="Flexi Seat Logo"
-            width={25}
-            height={25}
-          />
-          <Typography variant="h5" component="h3" color="#000000" fontWeight={600}>
+          <Image src="/logo.png" alt="Flexi Seat Logo" width={25} height={25} />
+          <Typography
+            variant="h5"
+            component="h3"
+            color="#000000"
+            fontWeight={600}
+          >
             Flexi Seat
           </Typography>
         </Box>
 
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <Box
-            sx={{ display: "flex", alignItems: "center", gap: 1, fontWeight: 500 }}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              fontWeight: 500,
+            }}
           >
             <Avatar
               src={userAvatar[currentUser as keyof typeof userAvatar]}
@@ -934,16 +975,16 @@ export default function Home() {
             >
               {currentUser?.charAt(0)}
             </Avatar>
-            <Box sx={{ fontSize: '0.9rem' }}>
+            <Box sx={{ fontSize: "0.9rem" }}>
               <p>{currentUser}</p>
-              <Typography sx={{ fontStyle: 'italic', fontSize: '0.75rem' }}>
-                {userEmail || 'No email available'}
+              <Typography sx={{ fontStyle: "italic", fontSize: "0.75rem" }}>
+                {userEmail || "No email available"}
               </Typography>
             </Box>
           </Box>
           <IconButton
             onClick={handleLogout}
-            sx={{ fontSize: '1rem' }}
+            sx={{ fontSize: "1rem" }}
             size="small"
           >
             <FontAwesomeIcon icon={faRightFromBracket} />
@@ -985,12 +1026,12 @@ export default function Home() {
             overflowX: "auto",
             overflowY: "hidden",
             alignItems: "center",
-            '&::-webkit-scrollbar': {
-              height: '6px',
+            "&::-webkit-scrollbar": {
+              height: "6px",
             },
-            '&::-webkit-scrollbar-thumb': {
-              backgroundColor: '#CBD5E1',
-              borderRadius: '3px',
+            "&::-webkit-scrollbar-thumb": {
+              backgroundColor: "#CBD5E1",
+              borderRadius: "3px",
             },
           }}
         >
@@ -1000,19 +1041,19 @@ export default function Home() {
             label="Today"
             sx={{
               cursor: "pointer",
-              borderRadius: '6px',
+              borderRadius: "6px",
               backgroundColor: "primary.main",
               color: "#fff",
-              border: 'none',
+              border: "none",
               fontWeight: 500,
-              fontSize: '0.875rem',
-              height: '36px',
+              fontSize: "0.875rem",
+              height: "36px",
               px: 2,
-              '& .MuiChip-label': {
+              "& .MuiChip-label": {
                 px: 0.5,
                 py: 0,
               },
-              '&:hover': {
+              "&:hover": {
                 backgroundColor: "primary.dark",
               },
             }}
@@ -1029,51 +1070,66 @@ export default function Home() {
               !dateChips.isAfterFridayDeadline && date < dateChips.today;
 
             // Show "Day, DD" format
-            const displayLabel = `${date.toLocaleDateString('en-US', { weekday: 'short' })}, ${String(date.getDate()).padStart(2, '0')}`;
+            const displayLabel = `${date.toLocaleDateString("en-US", {
+              weekday: "short",
+            })}, ${String(date.getDate()).padStart(2, "0")}`;
 
             // Determine icon based on whether user has booking for this date
-            const userBookingForDate = userBookings.find(b => b.date === dateStr);
+            const userBookingForDate = userBookings.find(
+              (b) => b.date === dateStr
+            );
             const hasBooking = !!userBookingForDate;
             const iconToUse = hasBooking ? faBriefcase : faHouse;
 
             // Set colors: white for selected, green for unselected with booking, gray for no booking
             const chipColor = isCurrentDate ? "#fff" : "#6B7280";
-            const iconColor = isCurrentDate ? "#fff" : (hasBooking ? "#61BF76" : "#6B7280");
+            const iconColor = isCurrentDate
+              ? "#fff"
+              : hasBooking
+              ? "#61BF76"
+              : "#6B7280";
 
             return (
               <Chip
                 clickable={!isPastDate}
                 key={dateStr}
-                icon={<FontAwesomeIcon icon={iconToUse} style={{ fontSize: '1rem', color: iconColor }} />}
+                icon={
+                  <FontAwesomeIcon
+                    icon={iconToUse}
+                    style={{ fontSize: "1rem", color: iconColor }}
+                  />
+                }
                 label={displayLabel}
                 sx={{
                   cursor: isPastDate ? "not-allowed" : "pointer",
                   opacity: isPastDate ? 0.5 : 1,
-                  borderRadius: '6px',
+                  borderRadius: "6px",
                   backgroundColor: isCurrentDate ? "primary.main" : "#E5E7EB",
                   color: chipColor,
-                  border: 'none',
+                  border: "none",
                   fontWeight: 500,
-                  fontSize: '0.875rem',
-                  height: '36px',
+                  fontSize: "0.875rem",
+                  height: "36px",
                   px: 2,
-                  '& .MuiChip-label': {
+                  "& .MuiChip-label": {
                     px: 0,
                     py: 0,
                   },
-                  '& .MuiChip-icon': {
-                    marginLeft: '0px',
-                    marginRight: '6px',
+                  "& .MuiChip-icon": {
+                    marginLeft: "0px",
+                    marginRight: "6px",
                     color: iconColor,
                   },
-                  '&:hover': {
-                    backgroundColor: isPastDate ? undefined : (isCurrentDate ? "primary.dark" : "#D1D5DB"),
+                  "&:hover": {
+                    backgroundColor: isPastDate
+                      ? undefined
+                      : isCurrentDate
+                      ? "primary.dark"
+                      : "#D1D5DB",
                   },
                 }}
                 onClick={
-                  !isPastDate
-                    ? () => handleDateClick(dateStr)
-                    : undefined
+                  !isPastDate ? () => handleDateClick(dateStr) : undefined
                 }
               />
             );
@@ -1142,12 +1198,16 @@ export default function Home() {
             width: { xs: "100%", md: drawerOpen ? "45%" : 0 },
             maxWidth: { xs: "100%", md: drawerOpen ? "450px" : 0 },
             overflow: "hidden",
-            transition: isResizing ? "none" : {
-              xs: "transform 0.3s ease-in-out",
-              md: "width 0.3s ease-in-out, max-width 0.3s ease-in-out",
-            },
+            transition: isResizing
+              ? "none"
+              : {
+                  xs: "transform 0.3s ease-in-out",
+                  md: "width 0.3s ease-in-out, max-width 0.3s ease-in-out",
+                },
             backgroundColor: "#F7F8FA",
-            boxShadow: drawerOpen ? { xs: "none", md: "-4px 0 12px rgba(0, 0, 0, 0.1)" } : "none",
+            boxShadow: drawerOpen
+              ? { xs: "none", md: "-4px 0 12px rgba(0, 0, 0, 0.1)" }
+              : "none",
             display: { xs: "flex", md: "flex" },
             flexDirection: "column",
             position: { xs: "fixed", md: "relative" },
@@ -1157,11 +1217,11 @@ export default function Home() {
             right: { xs: 0, md: "auto" },
             height: {
               xs: "calc(100dvh - 64px)", // Use dvh for dynamic viewport on mobile Safari
-              md: "auto"
+              md: "auto",
             },
             maxHeight: {
               xs: "calc(100dvh - 64px)", // Ensure it doesn't exceed viewport
-              md: "none"
+              md: "none",
             },
             zIndex: { xs: 1300, md: "auto" },
             transform: {
@@ -1191,8 +1251,8 @@ export default function Home() {
                     position: "relative",
                     px: 2,
                     py: 1.25,
-                    backgroundColor: "#FF6B35",
-                    color: "#fff",
+                    backgroundColor: "primary.main",
+                    color: "white.main",
                     minHeight: "56px",
                   }}
                 >
@@ -1203,7 +1263,7 @@ export default function Home() {
                       left: 8,
                       px: 1,
                       py: 0.5,
-                      color: "#fff",
+                      color: "white.main",
                       "&:hover": {
                         backgroundColor: "rgba(255,255,255,0.1)",
                       },
@@ -1252,7 +1312,9 @@ export default function Home() {
                     const tableLetter = seatId.charAt(0);
 
                     // Determine zone based on table letter
-                    const zone = SEATING_CONFIG.zones.zone1.tables.includes(tableLetter)
+                    const zone = SEATING_CONFIG.zones.zone1.tables.includes(
+                      tableLetter
+                    )
                       ? "A"
                       : "B";
 
@@ -1268,11 +1330,9 @@ export default function Home() {
                           handleDateToggle(seatId, dateStr, currentlyBooked)
                         }
                         modifiedDates={dateModifications[seatId] || {}}
-                        disabledDates={
-                          (allSeatsBookings[seatId] || [])
-                            .filter(booking => booking.userId !== currentUser)
-                            .map(booking => booking.date)
-                        }
+                        disabledDates={(allSeatsBookings[seatId] || [])
+                          .filter((booking) => booking.userId !== currentUser)
+                          .map((booking) => booking.date)}
                       />
                     );
                   })}
@@ -1280,7 +1340,9 @@ export default function Home() {
                   {/* Temporary seats (not yet saved) */}
                   {tempSeats.map((seatId) => {
                     const tableLetter = seatId.charAt(0);
-                    const zone = SEATING_CONFIG.zones.zone1.tables.includes(tableLetter)
+                    const zone = SEATING_CONFIG.zones.zone1.tables.includes(
+                      tableLetter
+                    )
                       ? "A"
                       : "B";
 
@@ -1296,11 +1358,9 @@ export default function Home() {
                           handleDateToggle(seatId, dateStr, currentlyBooked)
                         }
                         modifiedDates={dateModifications[seatId] || {}}
-                        disabledDates={
-                          (allSeatsBookings[seatId] || [])
-                            .filter(booking => booking.userId !== currentUser)
-                            .map(booking => booking.date)
-                        }
+                        disabledDates={(allSeatsBookings[seatId] || [])
+                          .filter((booking) => booking.userId !== currentUser)
+                          .map((booking) => booking.date)}
                       />
                     );
                   })}
@@ -1313,9 +1373,7 @@ export default function Home() {
                         color: "#6B7280",
                       }}
                     >
-                      <Typography variant="body1">
-                        No bookings yet
-                      </Typography>
+                      <Typography variant="body1">No bookings yet</Typography>
                     </Box>
                   )}
                 </Box>
@@ -1323,7 +1381,7 @@ export default function Home() {
                 {/* Drawer Footer with Buttons and Dropdown */}
                 <Box
                   sx={{
-                    backgroundColor: "#fff",
+                    backgroundColor: "white.main",
                     borderTop: "1px solid #E5E7EB",
                     flexShrink: 0, // Prevent footer from shrinking
                     position: { xs: "sticky", md: "relative" }, // Stick to bottom on mobile
@@ -1343,9 +1401,12 @@ export default function Home() {
                         options={getAvailableSeatsForDropdown()}
                         getOptionLabel={(seatId) => {
                           const tableLetter = seatId.charAt(0);
-                          const zone = SEATING_CONFIG.zones.zone1.tables.includes(tableLetter)
-                            ? "A"
-                            : "B";
+                          const zone =
+                            SEATING_CONFIG.zones.zone1.tables.includes(
+                              tableLetter
+                            )
+                              ? "A"
+                              : "B";
                           return `Desk ${seatId} - Zone ${zone}`;
                         }}
                         onChange={(_, value) => {
@@ -1361,13 +1422,13 @@ export default function Home() {
                             sx={{
                               "& .MuiOutlinedInput-root": {
                                 "& fieldset": {
-                                  borderColor: "#FF6B35",
+                                  borderColor: "primary.main",
                                 },
                                 "&:hover fieldset": {
-                                  borderColor: "#E55A2B",
+                                  borderColor: "primary.dark",
                                 },
                                 "&.Mui-focused fieldset": {
-                                  borderColor: "#FF6B35",
+                                  borderColor: "primary.main",
                                 },
                               },
                             }}
@@ -1386,7 +1447,7 @@ export default function Home() {
                       p: 2,
                       paddingBottom: {
                         xs: "calc(0.5rem + env(safe-area-inset-bottom))", // Add safe area padding for iPhone
-                        md: 2
+                        md: 2,
                       },
                     }}
                   >
@@ -1398,11 +1459,11 @@ export default function Home() {
                         textTransform: "none",
                         px: 4,
                         py: 1,
-                        backgroundColor: "#E5E7EB",
-                        color: "#374151",
+                        backgroundColor: "gray.main",
+                        color: "secondary.main",
                         boxShadow: "none",
                         "&:hover": {
-                          backgroundColor: "#D1D5DB",
+                          backgroundColor: "gray.main",
                           boxShadow: "none",
                         },
                       }}
@@ -1415,18 +1476,20 @@ export default function Home() {
                       {/* Plus Button */}
                       <Button
                         variant="contained"
-                        onClick={() => setShowAddSeatDropdown(!showAddSeatDropdown)}
+                        onClick={() =>
+                          setShowAddSeatDropdown(!showAddSeatDropdown)
+                        }
                         sx={{
                           textTransform: "none",
                           minWidth: "auto",
                           width: "40px",
                           height: "40px",
                           p: 0,
-                          backgroundColor: "#E5E7EB",
-                          color: "#374151",
+                          backgroundColor: "gray.main",
+                          color: "secondary.main",
                           boxShadow: "none",
                           "&:hover": {
-                            backgroundColor: "#D1D5DB",
+                            backgroundColor: "gray.main",
                             boxShadow: "none",
                           },
                         }}
@@ -1438,18 +1501,22 @@ export default function Home() {
                       <Button
                         variant="contained"
                         onClick={handleUpdateBookings}
-                        disabled={(Object.keys(dateModifications).length === 0 && tempSeats.length === 0) || isLoadingBookings}
+                        disabled={
+                          (Object.keys(dateModifications).length === 0 &&
+                            tempSeats.length === 0) ||
+                          isLoadingBookings
+                        }
                         sx={{
                           textTransform: "none",
                           px: 4,
                           py: 1,
-                          backgroundColor: "#FF6B35",
+                          backgroundColor: "primary.main",
                           "&:hover": {
-                            backgroundColor: "#E55A2B",
+                            backgroundColor: "primary.dark",
                           },
                           "&:disabled": {
-                            backgroundColor: "#D1D5DB",
-                            color: "#9CA3AF",
+                            backgroundColor: "gray.main",
+                            color: "secondary.main",
                           },
                         }}
                       >
@@ -1474,11 +1541,9 @@ export default function Home() {
         anchorPosition={modalAnchorPosition}
         allDates={dateChips.dates}
         allBookings={allBookingsForModal}
-        disabledDates={
-          (allSeatsBookings[mobileSeatModalSeatId] || [])
-            .filter(booking => booking.userId !== currentUser)
-            .map(booking => booking.date)
-        }
+        disabledDates={(allSeatsBookings[mobileSeatModalSeatId] || [])
+          .filter((booking) => booking.userId !== currentUser)
+          .map((booking) => booking.date)}
         onSuccess={handleModalSuccess}
       />
 
