@@ -1101,12 +1101,12 @@ export default function Home() {
             const hasBooking = !!userBookingForDate;
             const iconToUse = hasBooking ? faBriefcase : faHouse;
 
-            // Set colors: white for selected, green for unselected with booking, gray for no booking
-            const chipColor = isCurrentDate ? "#fff" : "#6B7280";
+            // Set colors: white for selected, blue for unselected with booking, gray for no booking
+            const chipColor = isCurrentDate ? "#fff" : hasBooking ? "#5A67BA" : "#6B7280";
             const iconColor = isCurrentDate
               ? "#fff"
               : hasBooking
-              ? "#61BF76"
+              ? "#5A67BA"
               : "#6B7280";
 
             return (
@@ -1124,7 +1124,7 @@ export default function Home() {
                   cursor: isPastDate ? "not-allowed" : "pointer",
                   opacity: isPastDate ? 0.5 : 1,
                   borderRadius: "6px",
-                  backgroundColor: isCurrentDate ? "primary.main" : "#E5E7EB",
+                  backgroundColor: isCurrentDate ? "primary.main" : hasBooking ? "#EAECF5": "#E5E7EB",
                   color: chipColor,
                   border: "none",
                   fontWeight: 500,
