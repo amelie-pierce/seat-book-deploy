@@ -2,13 +2,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import {
-  Container,
-  TextField,
-  Button,
-  Typography,
-  Box,
-} from "@mui/material";
+import { Container, TextField, Button, Typography, Box } from "@mui/material";
 import { vercelDataService } from "../../services/vercelDataService";
 
 export default function AuthPage() {
@@ -88,8 +82,7 @@ export default function AuthPage() {
         backgroundColor: "#f5f5f5",
       }}
     >
-      <Box
-      >
+      <Box>
         {/* Flexi Seat Header with Icon */}
         <Box
           sx={{
@@ -100,17 +93,12 @@ export default function AuthPage() {
             mb: 4,
           }}
         >
-          <Image
-            src="/logo.png"
-            alt="Flexi Seat Logo"
-            width={32}
-            height={32}
-          />
+          <Image src="/logo.png" alt="Flexi Seat Logo" width={32} height={32} />
           <Typography
             variant="h5"
             sx={{
               fontWeight: 600,
-              color: "#333",
+              color: "secondary.main",
             }}
           >
             Flexi Seat
@@ -124,7 +112,7 @@ export default function AuthPage() {
             px: 6,
             py: 4,
             textAlign: "center",
-            backgroundColor: "white",
+            backgroundColor: "white.main",
           }}
         >
           {/* Sign in Now! */}
